@@ -17,96 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
 	"path"
 	"testing"
-	"time"
+
+	"github.com/hashicorp/vault/http"
 )
 
-func devVaultServer(t *testing.T, token, address string) *os.Process {
-	url, _ := url.Parse(address)
-	cmd := exec.Command("vault", "server", "-dev",
-		"-dev-root-token-id", token,
-		"-dev-listen-address", url.Host)
-	if testing.Verbose() {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-	err := cmd.Start()
-	if err != nil {
-		t.Fatalf("couldn't start vault dev server: %v", err)
-	}
-	v := vaultApi{VaultConfig{
-		Address: address,
-		Token:   token,
-	}}
-	for retries := 5; retries > 0; retries-- {
-		_, err = v.Request(http.MethodGet, SysHealthURL, nil)
-		if err == nil {
-			break
-		}
-		<-time.After(50 * time.Millisecond)
-	}
-	if err != nil {
-		t.Fatalf("timeout while waiting for vault server to be ready: %v", err)
-	}
-	return cmd.Process
-}
-
-func setupAppRole(t *testing.T, token, address string, secret bool) string {
-	v := vaultApi{
-		VaultConfig{
-			Address: address,
-			Token:   token,
-		},
-	}
-	options := VaultRequestOptions{
-		Parameters: map[string]string{"type": "approle"},
-	}
-	_, err := v.Request(http.MethodPost, AuthAppRoleURL, &options)
-	if err != nil {
-		t.Fatalf("couldn't enable approle auth method: %s", err)
-	}
-
-	roleURL := path.Join(AppRoleURL, "testrole")
-	roleParams := make(map[string]string)
-	if !secret {
-		roleParams["bind_secret_id"] = "false"
-		roleParams["bound_cidr_list"] = "127.0.0.0/8"
-	}
-	options = VaultRequestOptions{Parameters: roleParams}
-	_, err = v.Request(http.MethodPost, roleURL, &options)
-	if err != nil {
-		t.Fatalf("couldn't create approle testrole: %s ", err)
-	}
-
-	roleIDURL := path.Join(roleURL, "role-id")
-	s, err := v.Request(http.MethodGet, roleIDURL, nil)
-	if err != nil {
-		t.Fatalf("couldn't obtain role id: %s", err)
-	}
-
-	roleID := s.Data["role_id"].(string)
-
-	return roleID
-}
-
 func TestLoginWithoutSecret(t *testing.T) {
-	token := "dev"
-	address := "http://127.0.0.1:8201"
-	server := devVaultServer(t, token, address)
-	defer server.Kill()
+	core, _, token := NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
 
 	v := vaultApi{
 		VaultConfig{
 			Address: address,
 		},
 	}
-
-	v.RoleID = setupAppRole(t, token, address, false)
+	v.RoleID = setupAppRole(t, "test", token, address, false)
 
 	err := v.Login()
 	if err != nil {
@@ -115,12 +42,12 @@ func TestLoginWithoutSecret(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	token := "dev"
-	address := "http://127.0.0.1:8201"
-	server := devVaultServer(t, token, address)
-	defer server.Kill()
+	core, _, token := NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
 
-	roleID := setupAppRole(t, token, address, true)
+	roleName := "test"
+	roleID := setupAppRole(t, roleName, token, address, true)
 
 	admin := vaultApi{
 		VaultConfig{
@@ -128,8 +55,8 @@ func TestLogin(t *testing.T) {
 			Token:   token,
 		},
 	}
-	secretIDURL := path.Join(AppRoleURL, "testrole", "secret-id")
-	s, err := admin.Request(http.MethodPost, secretIDURL, nil)
+	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
+	s, err := admin.Request("POST", secretIDURL, nil)
 	if err != nil {
 		t.Fatalf("couldn't obtain secret-id: %v", err)
 	}
@@ -150,12 +77,12 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLoginWithWrappedSecret(t *testing.T) {
-	token := "dev"
-	address := "http://127.0.0.1:8201"
-	server := devVaultServer(t, token, address)
-	defer server.Kill()
+	core, _, token := NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
 
-	roleID := setupAppRole(t, token, address, true)
+	roleName := "test"
+	roleID := setupAppRole(t, roleName, token, address, true)
 
 	admin := vaultApi{
 		VaultConfig{
@@ -163,12 +90,15 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 			Token:   token,
 		},
 	}
-	secretIDURL := path.Join(AppRoleURL, "testrole", "secret-id")
-	s, err := admin.Request(http.MethodPost, secretIDURL, &VaultRequestOptions{
+	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
+	s, err := admin.Request("POST", secretIDURL, &VaultRequestOptions{
 		WrapTTL: "10s",
 	})
 	if err != nil {
 		t.Fatalf("couldn't obtain wrapped secret-id: %v", err)
+	}
+	if s.WrapInfo == nil {
+		t.Fatalf("no wrapped information in secret: %+v", s)
 	}
 	wrappedSecretID := s.WrapInfo.Token
 
