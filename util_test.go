@@ -73,10 +73,8 @@ func NewTestCoreAppRole(t *testing.T) (*vault.Core, [][]byte, string) {
 
 func setupAppRole(t *testing.T, name, token, address string, secret bool) string {
 	v := vaultApi{
-		VaultConfig{
-			Address: address,
-			Token:   token,
-		},
+		Address: address,
+		Token:   token,
 	}
 	options := VaultRequestOptions{
 		Data: map[string]interface{}{"type": "approle"},

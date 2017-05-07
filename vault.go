@@ -47,7 +47,19 @@ type Vault interface {
 }
 
 type vaultApi struct {
-	VaultConfig
+	Address  string
+	RoleID   string
+	SecretID string
+	Token    string
+}
+
+func NewVault(c VaultConfig) Vault {
+	return &vaultApi{
+		Address:  c.Address,
+		RoleID:   c.RoleID,
+		SecretID: c.SecretID,
+		Token:    c.Token,
+	}
 }
 
 func (v *vaultApi) getClient() (*api.Client, error) {
@@ -135,8 +147,4 @@ func (v *vaultApi) Request(method, urlPath string, options *VaultRequestOptions)
 		return nil, nil
 	}
 	return api.ParseSecret(resp.Body)
-}
-
-func NewVault(config VaultConfig) Vault {
-	return &vaultApi{config}
 }

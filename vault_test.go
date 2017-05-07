@@ -28,11 +28,7 @@ func TestLoginWithoutSecret(t *testing.T) {
 	ln, address := http.TestServer(t, core)
 	defer ln.Close()
 
-	v := vaultApi{
-		VaultConfig{
-			Address: address,
-		},
-	}
+	v := vaultApi{Address: address}
 	v.RoleID = setupAppRole(t, "test", token, address, false)
 
 	err := v.Login()
@@ -50,10 +46,8 @@ func TestLogin(t *testing.T) {
 	roleID := setupAppRole(t, roleName, token, address, true)
 
 	admin := vaultApi{
-		VaultConfig{
-			Address: address,
-			Token:   token,
-		},
+		Address: address,
+		Token:   token,
 	}
 	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
 	s, err := admin.Request("POST", secretIDURL, nil)
@@ -63,11 +57,9 @@ func TestLogin(t *testing.T) {
 	secretID, _ := s.Data["secret_id"].(string)
 
 	v := vaultApi{
-		VaultConfig{
-			Address:  address,
-			RoleID:   roleID,
-			SecretID: secretID,
-		},
+		Address:  address,
+		RoleID:   roleID,
+		SecretID: secretID,
 	}
 
 	err = v.Login()
@@ -85,10 +77,8 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 	roleID := setupAppRole(t, roleName, token, address, true)
 
 	admin := vaultApi{
-		VaultConfig{
-			Address: address,
-			Token:   token,
-		},
+		Address: address,
+		Token:   token,
 	}
 	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
 	s, err := admin.Request("POST", secretIDURL, &VaultRequestOptions{
@@ -103,10 +93,8 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 	wrappedSecretID := s.WrapInfo.Token
 
 	v := vaultApi{
-		VaultConfig{
-			Address: address,
-			RoleID:  roleID,
-		},
+		Address: address,
+		RoleID:  roleID,
 	}
 	err = v.UnwrapSecretID(wrappedSecretID)
 	if err != nil {
