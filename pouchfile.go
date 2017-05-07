@@ -25,6 +25,8 @@ import (
 const defaultPouchfilePath = "Pouchfile"
 
 type Pouchfile struct {
+	WrappedSecretIDPath string `json:"wrappedSecretIDPath,omitempty"`
+
 	Vault   VaultConfig    `json:"vault,omitempty"`
 	Systemd SystemdConfig  `json:"systemd,omitempty"`
 	Secrets []SecretConfig `json:"secrets,omitempty"`
@@ -48,11 +50,11 @@ type SystemdConfig struct {
 }
 
 type SecretConfig struct {
-	VaultURL   string            `json:"vaultURL,omitempty"`
-	HTTPMethod string            `json:"httpMethod,omitempty"`
-	Parameters map[string]string `json:"parameters,omitempty"`
-	LocalDir   string            `json:"localDir,omitempty"`
-	FileMap    FileMapConfig     `json:"fileMap,omitempty"`
+	VaultURL   string                   `json:"vaultURL,omitempty"`
+	HTTPMethod string                   `json:"httpMethod,omitempty"`
+	Data       map[string]interface{}   `json:"data,omitempty"`
+	LocalDir   string                   `json:"localDir,omitempty"`
+	FileMap    map[string]FileMapConfig `json:"fileMap,omitempty"`
 }
 
 type FileMapConfig struct {

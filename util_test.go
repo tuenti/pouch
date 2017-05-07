@@ -22,6 +22,7 @@ import (
 
 	log "github.com/mgutz/logxi/v1"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/builtin/credential/approle"
 	"github.com/hashicorp/vault/helper/logformat"
 	"github.com/hashicorp/vault/logical"
@@ -105,4 +106,53 @@ func setupAppRole(t *testing.T, name, token, address string, secret bool) string
 	roleID := s.Data["role_id"].(string)
 
 	return roleID
+}
+
+type DummyVault struct {
+	t *testing.T
+
+	ExpectedToken    string
+	ExpectedSecretID string
+	WrappedSecretID  string
+
+	Token    string
+	RoleID   string
+	SecretID string
+
+	Responses map[string]*api.Secret
+}
+
+func (v *DummyVault) Login() error {
+	if v.Token != "" {
+		return nil
+	}
+	if v.RoleID == "" {
+		v.t.Fatalf("unset roleID")
+	}
+	if v.SecretID != v.ExpectedSecretID {
+		v.t.Fatalf("incorrect secretID")
+	}
+	v.Token = v.ExpectedToken
+	return nil
+}
+
+func (v *DummyVault) UnwrapSecretID(token string) error {
+	if token != v.WrappedSecretID {
+		v.t.Fatalf("incorrect wrapped secret ID")
+	}
+	v.SecretID = v.ExpectedSecretID
+	v.WrappedSecretID = ""
+	return nil
+}
+
+func (v *DummyVault) Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error) {
+	if v.Token != v.ExpectedToken {
+		v.t.Fatalf("incorrect token on request")
+	}
+	k := method + urlPath
+	s, ok := v.Responses[k]
+	if !ok {
+		v.t.Fatalf("incorrect response")
+	}
+	return s, nil
 }

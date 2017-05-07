@@ -16,8 +16,15 @@ limitations under the License.
 
 package main
 
+import (
+	"fmt"
+	"io/ioutil"
+	"path"
+)
+
 type Pouch interface {
 	Run() error
+	Watch(path string) error
 }
 
 type pouch struct {
@@ -26,6 +33,32 @@ type pouch struct {
 }
 
 func (p *pouch) Run() error {
+	err := p.Vault.Login()
+	if err != nil {
+		return err
+	}
+	for _, c := range p.Secrets {
+		options := &VaultRequestOptions{Data: c.Data}
+		s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+		if err != nil {
+			return err
+		}
+		for k, fm := range c.FileMap {
+			v, found := s.Data[k]
+			if !found {
+				return fmt.Errorf("secret '%s' not found in '%s'", k, c.VaultURL)
+			}
+			vStr, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("secret '%s' from '%s' couldn't be converted to string", k, c.VaultURL)
+			}
+			p := path.Join(c.LocalDir, fm.Name)
+			err := ioutil.WriteFile(p, []byte(vStr), 0600)
+			if err != nil {
+				return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
+			}
+		}
+	}
 	return nil
 }
 

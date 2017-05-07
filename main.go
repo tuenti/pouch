@@ -45,7 +45,12 @@ func main() {
 	vault := NewVault(pouchfile.Vault)
 
 	pouch := NewPouch(vault, pouchfile.Secrets)
-	err = pouch.Run()
+
+	if pouchfile.WrappedSecretIDPath != "" {
+		err = pouch.Watch(pouchfile.WrappedSecretIDPath)
+	} else {
+		err = pouch.Run()
+	}
 	if err != nil {
 		log.Fatalf("Pouch failed: %v", err)
 	}
