@@ -17,14 +17,8 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"net/url"
-	"path"
-	"strings"
 
 	"github.com/hashicorp/vault/api"
 )
@@ -38,22 +32,12 @@ const (
 	AuthAppRoleURL  = "/v1/sys/auth/approle"
 	AppRoleLoginURL = "/v1/auth/approle/login"
 	AppRoleURL      = "/v1/auth/approle/role"
-
-	UnwrapURL = "/v1/sys/wrapping/unwrap"
 )
 
 type VaultRequestOptions struct {
 	WrapTTL string
 
-	Parameters map[string]string
-}
-
-type VaultErrorResponse struct {
-	Errors []string
-}
-
-func (r VaultErrorResponse) String() string {
-	return strings.Join(r.Errors, ", ")
+	Data map[string]interface{}
 }
 
 type Vault interface {
@@ -66,6 +50,14 @@ type vaultApi struct {
 	VaultConfig
 }
 
+func (v *vaultApi) getClient() (*api.Client, error) {
+	config := api.DefaultConfig()
+	if v.Address != "" {
+		config.Address = v.Address
+	}
+	return api.NewClient(config)
+}
+
 func (v *vaultApi) Login() error {
 	if v.Token != "" {
 		return nil
@@ -73,12 +65,12 @@ func (v *vaultApi) Login() error {
 	if v.RoleID == "" {
 		return fmt.Errorf("role ID needed")
 	}
-	params := make(map[string]string)
-	params["role_id"] = v.RoleID
+	data := make(map[string]interface{})
+	data["role_id"] = v.RoleID
 	if v.SecretID != "" {
-		params["secret_id"] = v.SecretID
+		data["secret_id"] = v.SecretID
 	}
-	options := VaultRequestOptions{Parameters: params}
+	options := VaultRequestOptions{Data: data}
 	resp, err := v.Request(http.MethodPost, AppRoleLoginURL, &options)
 	if err != nil {
 		return err
@@ -90,9 +82,12 @@ func (v *vaultApi) Login() error {
 }
 
 func (v *vaultApi) UnwrapSecretID(token string) error {
-	c := vaultApi{v.VaultConfig}
-	c.Token = token
-	resp, err := c.Request(http.MethodPost, UnwrapURL, nil)
+	c, err := v.getClient()
+	if err != nil {
+		return err
+	}
+	c.SetToken(token)
+	resp, err := c.Logical().Unwrap(token)
 	if err != nil {
 		return err
 	}
@@ -108,69 +103,38 @@ func (v *vaultApi) UnwrapSecretID(token string) error {
 }
 
 func (v *vaultApi) Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error) {
-	u, err := url.Parse(v.Address)
-	if err != nil {
-		return nil, err
-	}
-	u.Path = path.Join(u.Path, urlPath)
-
-	reqBody := bytes.NewBuffer([]byte{})
-	if options != nil && len(options.Parameters) > 0 {
-		d, err := json.Marshal(options.Parameters)
-		if err != nil {
-			return nil, err
-		}
-		reqBody = bytes.NewBuffer(d)
-	}
-
-	req, err := http.NewRequest(method, u.String(), reqBody)
+	c, err := v.getClient()
 	if err != nil {
 		return nil, err
 	}
 	if v.Token != "" {
-		req.Header.Add(TokenHeader, v.Token)
-	}
-	if options != nil && options.WrapTTL != "" {
-		req.Header.Add(WrapTTLHeader, options.WrapTTL)
+		c.SetToken(v.Token)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	r := c.NewRequest(method, urlPath)
+	if options != nil {
+		if len(options.Data) > 0 {
+			err = r.SetJSONBody(options.Data)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if options.WrapTTL != "" {
+			r.WrapTTL = options.WrapTTL
+		}
+	}
+
+	resp, err := c.RawRequest(r)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		var secret api.Secret
-		err = json.Unmarshal(body, &secret)
-		if err != nil {
-			return nil, err
-		}
-
-		return &secret, nil
-	case http.StatusNoContent:
+	if resp.StatusCode == http.StatusNoContent {
 		return nil, nil
-	default:
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf(resp.Status)
-		}
-
-		var errResp VaultErrorResponse
-		err = json.Unmarshal(body, &errResp)
-		if err != nil {
-			return nil, fmt.Errorf(resp.Status)
-		}
-
-		return nil, fmt.Errorf("%s (%s)", resp.Status, errResp)
-
 	}
+	return api.ParseSecret(resp.Body)
 }
 
 func NewVault(config VaultConfig) Vault {
