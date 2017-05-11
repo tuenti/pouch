@@ -17,7 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"io"
 	"io/ioutil"
+	"os"
 
 	"github.com/ghodss/yaml"
 )
@@ -62,7 +64,15 @@ type FileMapConfig struct {
 }
 
 func LoadPouchfile(path string) (*Pouchfile, error) {
-	d, err := ioutil.ReadFile(path)
+	r, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return loadPouchfile(r)
+}
+
+func loadPouchfile(r io.Reader) (*Pouchfile, error) {
+	d, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
