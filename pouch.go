@@ -19,17 +19,31 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"path"
 )
 
 type Pouch interface {
 	Run() error
 	Watch(path string) error
+	AddReadyNotifier(ReadyNotifier)
+	AddReloadNotifier(ReloadNotifier)
+}
+
+type ReadyNotifier interface {
+	NotifyReady() error
+}
+
+type ReloadNotifier interface {
+	NotifyReload() error
 }
 
 type pouch struct {
 	Vault   Vault
 	Secrets []SecretConfig
+
+	readyNotifiers  []ReadyNotifier
+	reloadNotifiers []ReloadNotifier
 }
 
 func (p *pouch) Run() error {
@@ -59,9 +73,36 @@ func (p *pouch) Run() error {
 			}
 		}
 	}
+	p.NotifyReady()
 	return nil
 }
 
 func NewPouch(v Vault, s []SecretConfig) Pouch {
-	return &pouch{v, s}
+	return &pouch{Vault: v, Secrets: s}
+}
+
+func (p *pouch) AddReadyNotifier(n ReadyNotifier) {
+	p.readyNotifiers = append(p.readyNotifiers, n)
+}
+
+func (p *pouch) NotifyReady() {
+	for _, n := range p.readyNotifiers {
+		err := n.NotifyReady()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func (p *pouch) AddReloadNotifier(n ReloadNotifier) {
+	p.reloadNotifiers = append(p.reloadNotifiers, n)
+}
+
+func (p *pouch) NotifyReload() {
+	for _, n := range p.reloadNotifiers {
+		err := n.NotifyReload()
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }

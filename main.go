@@ -46,6 +46,13 @@ func main() {
 
 	pouch := NewPouch(vault, pouchfile.Secrets)
 
+	systemd := NewSystemd(pouchfile.Systemd)
+	if systemd.IsAvailable() {
+		pouch.AddReadyNotifier(systemd)
+		pouch.AddReloadNotifier(systemd)
+	}
+	defer systemd.Close()
+
 	if pouchfile.WrappedSecretIDPath != "" {
 		err = pouch.Watch(pouchfile.WrappedSecretIDPath)
 	} else {

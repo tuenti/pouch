@@ -57,6 +57,7 @@ func (p *pouch) Watch(path string) error {
 			select {
 			case event := <-watcher.Events:
 				if event.Name == path && event.Op&fsnotify.Write != 0 {
+					p.NotifyReload()
 					err := p.handleWrapped(path)
 					if err != nil {
 						errors <- err
