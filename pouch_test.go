@@ -53,10 +53,9 @@ func TestPouchRun(t *testing.T) {
 		{
 			VaultURL:   "/v1/foo",
 			HTTPMethod: "GET",
-			LocalDir:   tmpdir,
-			FileMap: map[string]FileMapConfig{
-				"foo": {Name: "foo"},
-				"bar": {Name: "bar"},
+			Files: []FileConfig{
+				{Path: path.Join(tmpdir, "foo"), Template: "{{ .foo }}"},
+				{Path: path.Join(tmpdir, "bar"), Template: "{{ .bar }}"},
 			},
 		},
 	}
@@ -113,9 +112,8 @@ func TestPouchWatch(t *testing.T) {
 		{
 			VaultURL:   "/v1/foo",
 			HTTPMethod: "GET",
-			LocalDir:   tmpdir,
-			FileMap: map[string]FileMapConfig{
-				"foo": {Name: "foo"},
+			Files: []FileConfig{
+				{Path: path.Join(tmpdir, "foo"), Template: "{{ .foo }}"},
 			},
 		},
 	}

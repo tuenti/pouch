@@ -21,7 +21,8 @@ import (
 	"testing"
 )
 
-var casePouchfile = `
+var casePouchfiles = []string{
+	`
 wrappedSecretIDPath: /var/run/vault_token
 vault:
   address: http://127.0.0.1:8200
@@ -34,15 +35,40 @@ systemd:
 secrets:
 - vaultURL: /v1/kubernetes-pki/issue/kubelet
   httpMethod: POST
-  localDir: /etc/kubernetes/ssl
-  fileMap:
-    private_key:
-      name: client.key
-    certificate:
-      name: client.crt
-    issuing_ca:
-      name: ca.cr
-`
+  files:
+  - path: /etc/kubernetes/ssl/client.key
+    template: |
+      {{ .private_key }}
+  - path: /etc/kubernetes/ssl/client.crt
+    template: |
+      {{ .certificate }}
+  - path: /etc/kubernetes/ssl/ca.crt
+    template: |
+      {{ .issuing_ca }}
+`,
+	`
+wrappedSecretIDPath: /var/run/vault_token
+vault:
+  address: http://127.0.0.1:8200
+  roleID: kubelet
+  secretID: ""
+  token: ""
+systemd:
+  enabled: true
+  autoRestart: false
+secrets:
+- vaultURL: /v1/pki/issue/nginx
+  httpMethod: POST
+  files:
+  - path: /etc/nginx/ssl/bundle.crt
+    template: |
+      {{ .certificate }}
+      {{ .issuing_ca }}
+  - path: /etc/nginx/ssl/server.key
+    template: |
+      {{ .private_key }}
+`,
+}
 
 var wrongPouchfile = `
 wrappedSecretIDPath: /var/run/vault_token
@@ -58,27 +84,21 @@ systemd:
 secrets:
 - vaultURL: /v1/kubernetes-pki/issue/kubelet
   httpMethod: POST
-  localDir: /etc/kubernetes/ssl
-  fileMap:
-    private_key:
-      name: client.key
-    certificate:
-      name: client.crt
-    issuing_ca:
-      name: ca.crt
 `
 
 func TestLoadPouchfile(t *testing.T) {
-	_, err := loadPouchfile(strings.NewReader(casePouchfile))
-	if err != nil {
-		t.Fatal(err)
+	for _, c := range casePouchfiles {
+		_, err := loadPouchfile(strings.NewReader(c))
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestWrongPouchfile(t *testing.T) {
 	// TODO: Detect unexpected fields (https://github.com/golang/go/issues/15314)
 	t.SkipNow()
-	_, err := loadPouchfile(strings.NewReader(casePouchfile))
+	_, err := loadPouchfile(strings.NewReader(wrongPouchfile))
 	if err == nil {
 		t.Fatal("Pouchfile load should have failed")
 	}

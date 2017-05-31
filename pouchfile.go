@@ -52,15 +52,15 @@ type SystemdConfig struct {
 }
 
 type SecretConfig struct {
-	VaultURL   string                   `json:"vaultURL,omitempty"`
-	HTTPMethod string                   `json:"httpMethod,omitempty"`
-	Data       map[string]interface{}   `json:"data,omitempty"`
-	LocalDir   string                   `json:"localDir,omitempty"`
-	FileMap    map[string]FileMapConfig `json:"fileMap,omitempty"`
+	VaultURL   string                 `json:"vaultURL,omitempty"`
+	HTTPMethod string                 `json:"httpMethod,omitempty"`
+	Data       map[string]interface{} `json:"data,omitempty"`
+	Files      []FileConfig           `json:"files,omitempty"`
 }
 
-type FileMapConfig struct {
-	Name string `json:"name,omitempty"`
+type FileConfig struct {
+	Path     string `json:"path,omitempty"`
+	Template string `json:"template,omitempty"`
 }
 
 func LoadPouchfile(path string) (*Pouchfile, error) {

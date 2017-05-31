@@ -17,10 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"path"
+	"text/template"
 )
 
 type Pouch interface {
@@ -57,17 +60,28 @@ func (p *pouch) Run() error {
 		if err != nil {
 			return err
 		}
-		for k, fm := range c.FileMap {
-			v, found := s.Data[k]
-			if !found {
-				return fmt.Errorf("secret '%s' not found in '%s'", k, c.VaultURL)
+		for _, fc := range c.Files {
+			dir := path.Dir(fc.Path)
+			err := os.MkdirAll(dir, 0700)
+			if err != nil {
+				return err
 			}
-			vStr, ok := v.(string)
-			if !ok {
-				return fmt.Errorf("secret '%s' from '%s' couldn't be converted to string", k, c.VaultURL)
+
+			var content string
+			if fc.Template != "" {
+				t, err := template.New("file").Parse(fc.Template)
+				if err != nil {
+					return err
+				}
+				var b bytes.Buffer
+				err = t.Execute(&b, s.Data)
+				if err != nil {
+					return err
+				}
+				content = b.String()
 			}
-			p := path.Join(c.LocalDir, fm.Name)
-			err := ioutil.WriteFile(p, []byte(vStr), 0600)
+
+			err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
 			if err != nil {
 				return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
 			}
