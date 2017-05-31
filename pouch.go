@@ -29,6 +29,7 @@ import (
 type Pouch interface {
 	Run() error
 	Watch(path string) error
+	PendingSecrets() bool
 	AddReadyNotifier(ReadyNotifier)
 	AddReloadNotifier(ReloadNotifier)
 }
@@ -39,6 +40,7 @@ type ReadyNotifier interface {
 
 type ReloadNotifier interface {
 	NotifyReload() error
+	AutoRestart() error
 }
 
 type pouch struct {
@@ -95,6 +97,17 @@ func NewPouch(v Vault, s []SecretConfig) Pouch {
 	return &pouch{Vault: v, Secrets: s}
 }
 
+func (p *pouch) PendingSecrets() bool {
+	for _, c := range p.Secrets {
+		for _, fc := range c.Files {
+			if _, err := os.Stat(fc.Path); os.IsNotExist(err) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *pouch) AddReadyNotifier(n ReadyNotifier) {
 	p.readyNotifiers = append(p.readyNotifiers, n)
 }
@@ -119,4 +132,14 @@ func (p *pouch) NotifyReload() {
 			log.Println(err)
 		}
 	}
+}
+
+func (p *pouch) AutoRestart() {
+	for _, n := range p.reloadNotifiers {
+		err := n.AutoRestart()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 }

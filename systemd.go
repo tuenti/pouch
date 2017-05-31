@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-systemd/daemon"
+	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/util"
 )
 
@@ -109,6 +110,49 @@ func (s *systemd) NotifyReload() error {
 	}
 	if !sent {
 		return fmt.Errorf("reload notification to dbus was not sent")
+	}
+	return nil
+}
+
+func (s *systemd) AutoRestart() error {
+	if s.autoRestart == nil || !*s.autoRestart {
+		return nil
+	}
+
+	c, err := dbus.New()
+	if err != nil {
+		return err
+	}
+
+	name, _ := s.getName()
+	propagateToProp, err := c.GetUnitProperty(name, "PropagatesReloadTo")
+	if err != nil {
+		return err
+	}
+
+	units, ok := propagateToProp.Value.Value().([]string)
+	if !ok {
+		return fmt.Errorf("couldn't convert property to units list (value: %+v)", propagateToProp.Value.Value())
+	}
+
+	errors := false
+	results := make([]chan string, len(units))
+	for i, unit := range units {
+		results[i] = make(chan string, 1)
+		_, err := c.ReloadOrRestartUnit(unit, "replace", results[i])
+		if err != nil {
+			log.Printf("error reloading %s: %v\n", unit, err)
+			errors = true
+		}
+	}
+	for i, result := range results {
+		if r := <-result; r != "done" {
+			log.Printf("reload job for %s is not done (found: %s)", units[i], r)
+			errors = true
+		}
+	}
+	if errors {
+		return fmt.Errorf("there were errors when restarting units")
 	}
 	return nil
 }

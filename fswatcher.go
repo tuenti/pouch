@@ -18,6 +18,7 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"path/filepath"
 	"strings"
 
@@ -63,6 +64,7 @@ func (p *pouch) Watch(path string) error {
 						errors <- err
 						return
 					}
+					p.AutoRestart()
 				}
 			case err := <-watcher.Errors:
 				errors <- err
@@ -70,6 +72,11 @@ func (p *pouch) Watch(path string) error {
 			}
 		}
 	}()
+
+	if !p.PendingSecrets() {
+		log.Println("No pending secrets, we are ready")
+		p.NotifyReady()
+	}
 
 	err = watcher.Add(dir)
 	if err != nil {
