@@ -1,0 +1,15 @@
+[Unit]
+Description=Pouch
+
+[Service]
+Type=notify
+Restart=always
+ExecStart=/usr/bin/rkt run ${POUCH_IMAGE} \
+    --inherit-env \
+    --stage1-name=coreos.com/rkt/stage1-fly:1.26.0 --trust-keys-from-https \
+    --volume config,kind=host,source=/etc/pouch/Pouchfile \
+    --mount volume=config,target=/etc/pouch/Pouchfile \
+    --volume systemd,kind=host,source=/run/systemd \
+    --mount volume=systemd,target=/run/systemd \
+    ${RKT_OPTIONS} \
+    --exec=/usr/bin/pouch -- -pouchfile /etc/pouch/Pouchfile
