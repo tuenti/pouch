@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/coreos/go-systemd/daemon"
@@ -28,11 +29,12 @@ import (
 
 type SystemD interface {
 	IsAvailable() bool
+	CanNotify() bool
 	UnitName() (string, error)
 	Close()
 
-	ReloadNotifier
-	ReadyNotifier
+	StatusNotifier
+	AutoReloader
 }
 
 func NewSystemd(c SystemdConfig) SystemD {
@@ -74,22 +76,37 @@ func (s *systemd) IsAvailable() bool {
 	}
 
 	if !util.IsRunningSystemd() {
-		log.Printf("systemd is not running")
+		log.Printf("Systemd is not running")
 		return false
 	}
 
 	name, err := s.getName()
 	if err != nil {
-		log.Printf("couldn't obtain current unit name: %v", err)
+		log.Printf("Couldn't obtain current unit name: %v", err)
 		return false
 	}
 	if !strings.HasSuffix(name, ".service") {
-		log.Printf("process is not started from a service unit, unit name found: %s", name)
+		log.Printf("Process is not started from a service unit, unit name found: %s", name)
 		return false
 	}
 
 	log.Printf("systemd available, unit name: %s\n", name)
 
+	return true
+}
+
+const NotifySocketVar = "NOTIFY_SOCKET"
+
+func (s *systemd) CanNotify() bool {
+	notifySocket := os.Getenv(NotifySocketVar)
+	if notifySocket == "" {
+		log.Println("NOTIFY_SOCKET environment variable is not set")
+		return false
+	}
+
+	if _, err := os.Stat(notifySocket); os.IsNotExist(err) {
+		log.Printf("Notify socket (%s) doesn't exist\n", notifySocket)
+	}
 	return true
 }
 
@@ -115,7 +132,7 @@ func (s *systemd) NotifyReload() error {
 	return nil
 }
 
-func (s *systemd) AutoRestart() error {
+func (s *systemd) AutoReload() error {
 	if s.autoRestart == nil || !*s.autoRestart {
 		return nil
 	}

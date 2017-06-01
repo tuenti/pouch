@@ -48,8 +48,10 @@ func main() {
 
 	systemd := NewSystemd(pouchfile.Systemd)
 	if systemd.IsAvailable() {
-		pouch.AddReadyNotifier(systemd)
-		pouch.AddReloadNotifier(systemd)
+		pouch.AddAutoReloader(systemd)
+		if systemd.CanNotify() {
+			pouch.AddStatusNotifier(systemd)
+		}
 	}
 	defer systemd.Close()
 

@@ -30,25 +30,25 @@ type Pouch interface {
 	Run() error
 	Watch(path string) error
 	PendingSecrets() bool
-	AddReadyNotifier(ReadyNotifier)
-	AddReloadNotifier(ReloadNotifier)
+	AddStatusNotifier(StatusNotifier)
+	AddAutoReloader(AutoReloader)
 }
 
-type ReadyNotifier interface {
+type StatusNotifier interface {
 	NotifyReady() error
+	NotifyReload() error
 }
 
-type ReloadNotifier interface {
-	NotifyReload() error
-	AutoRestart() error
+type AutoReloader interface {
+	AutoReload() error
 }
 
 type pouch struct {
 	Vault   Vault
 	Secrets []SecretConfig
 
-	readyNotifiers  []ReadyNotifier
-	reloadNotifiers []ReloadNotifier
+	statusNotifiers []StatusNotifier
+	autoReloaders   []AutoReloader
 }
 
 func (p *pouch) Run() error {
@@ -108,12 +108,12 @@ func (p *pouch) PendingSecrets() bool {
 	return false
 }
 
-func (p *pouch) AddReadyNotifier(n ReadyNotifier) {
-	p.readyNotifiers = append(p.readyNotifiers, n)
+func (p *pouch) AddStatusNotifier(n StatusNotifier) {
+	p.statusNotifiers = append(p.statusNotifiers, n)
 }
 
 func (p *pouch) NotifyReady() {
-	for _, n := range p.readyNotifiers {
+	for _, n := range p.statusNotifiers {
 		err := n.NotifyReady()
 		if err != nil {
 			log.Println(err)
@@ -121,12 +121,8 @@ func (p *pouch) NotifyReady() {
 	}
 }
 
-func (p *pouch) AddReloadNotifier(n ReloadNotifier) {
-	p.reloadNotifiers = append(p.reloadNotifiers, n)
-}
-
 func (p *pouch) NotifyReload() {
-	for _, n := range p.reloadNotifiers {
+	for _, n := range p.statusNotifiers {
 		err := n.NotifyReload()
 		if err != nil {
 			log.Println(err)
@@ -134,9 +130,13 @@ func (p *pouch) NotifyReload() {
 	}
 }
 
+func (p *pouch) AddAutoReloader(n AutoReloader) {
+	p.autoReloaders = append(p.autoReloaders, n)
+}
+
 func (p *pouch) AutoRestart() {
-	for _, n := range p.reloadNotifiers {
-		err := n.AutoRestart()
+	for _, n := range p.autoReloaders {
+		err := n.AutoReload()
 		if err != nil {
 			log.Println(err)
 		}
