@@ -75,6 +75,7 @@ func (s *systemd) IsAvailable() bool {
 
 	if !util.IsRunningSystemd() {
 		log.Printf("systemd is not running")
+		return false
 	}
 
 	name, err := s.getName()
