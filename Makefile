@@ -12,6 +12,9 @@ $(DOCKER_IMAGE_FILE): all
 aci: $(DOCKER_IMAGE_FILE)
 	docker2aci $(DOCKER_IMAGE_FILE)
 
+clean:
+	rm -f pouch *.docker *.aci
+
 release:
 	@if echo $(VERSION) | grep -q "dev$$" ; then echo Set VERSION variable to release; exit 1; fi
 	@if git show v$(VERSION) > /dev/null 2>&1; then echo Version $(VERSION) already exists; exit 1; fi
