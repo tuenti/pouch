@@ -1,0 +1,4 @@
+pouch
+.vagrant
+*.docker
+*.aci
