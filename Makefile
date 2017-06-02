@@ -13,7 +13,7 @@ aci: $(DOCKER_IMAGE_FILE)
 	docker2aci $(DOCKER_IMAGE_FILE)
 
 clean:
-	rm -f pouch *.docker *.aci
+	rm -f pouch pouchctl *.docker *.aci
 
 release:
 	@if echo $(VERSION) | grep -q "dev$$" ; then echo Set VERSION variable to release; exit 1; fi
