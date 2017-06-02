@@ -21,9 +21,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/tuenti/pouch"
 )
 
 var version = "dev"
+
+const defaultPouchfilePath = "Pouchfile"
 
 func main() {
 	var pouchfilePath string
@@ -37,28 +41,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	pouchfile, err := LoadPouchfile(pouchfilePath)
+	pouchfile, err := pouch.LoadPouchfile(pouchfilePath)
 	if err != nil {
 		log.Fatalf("Couldn't load Pouchfile: %v", err)
 	}
 
-	vault := NewVault(pouchfile.Vault)
+	vault := pouch.NewVault(pouchfile.Vault)
 
-	pouch := NewPouch(vault, pouchfile.Secrets)
+	p := pouch.NewPouch(vault, pouchfile.Secrets)
 
-	systemd := NewSystemd(pouchfile.Systemd)
+	systemd := pouch.NewSystemd(pouchfile.Systemd)
 	if systemd.IsAvailable() {
-		pouch.AddAutoReloader(systemd)
+		p.AddAutoReloader(systemd)
 		if systemd.CanNotify() {
-			pouch.AddStatusNotifier(systemd)
+			p.AddStatusNotifier(systemd)
 		}
 	}
 	defer systemd.Close()
 
 	if pouchfile.WrappedSecretIDPath != "" {
-		err = pouch.Watch(pouchfile.WrappedSecretIDPath)
+		err = p.Watch(pouchfile.WrappedSecretIDPath)
 	} else {
-		err = pouch.Run()
+		err = p.Run()
 	}
 	if err != nil {
 		log.Fatalf("Pouch failed: %v", err)

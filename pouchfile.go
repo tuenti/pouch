@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package pouch
 
 import (
 	"io"
@@ -23,8 +23,6 @@ import (
 
 	"github.com/ghodss/yaml"
 )
-
-const defaultPouchfilePath = "Pouchfile"
 
 type Pouchfile struct {
 	WrappedSecretIDPath string `json:"wrappedSecretIDPath,omitempty"`

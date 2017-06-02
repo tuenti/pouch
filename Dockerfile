@@ -1,17 +1,18 @@
 FROM golang:1.8.3 AS build
 
 ARG version=dev
+ARG package=github.com/tuenti/pouch
 
 ENV GOPATH /gopath
-ENV SRC /gopath/src/github.com/tuenti/pouch
+ENV SRC $GOPATH/src/$package
 
 WORKDIR $SRC
 COPY . $SRC
-RUN go test
-RUN go install -ldflags "-X main.version=$version"
+RUN go test . ./cmd/...
+RUN go install -ldflags "-X main.version=$version" $package/cmd/...
 
 FROM ubuntu:17.04
 # libsystemd is dynamically loaded by go-systemd
 RUN apt-get update && apt-get install -y libsystemd0 && rm -rf /var/lib/apt/lists/*
-COPY --from=build /gopath/bin/pouch /usr/bin/pouch
+COPY --from=build /gopath/bin/* /usr/bin/
 CMD /usr/bin/pouch
