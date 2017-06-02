@@ -7,7 +7,7 @@ ENV SRC /gopath/src/github.com/tuenti/pouch
 
 WORKDIR $SRC
 COPY . $SRC
-RUN go get -d ./...
+RUN go test
 RUN go install -ldflags "-X main.version=$version"
 
 FROM ubuntu:17.04
