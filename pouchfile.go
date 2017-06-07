@@ -25,7 +25,7 @@ import (
 )
 
 type Pouchfile struct {
-	WrappedSecretIDPath string `json:"wrappedSecretIDPath,omitempty"`
+	WrappedSecretIDPath string `json:"wrapped_secret_id_path,omitempty"`
 
 	Vault   VaultConfig    `json:"vault,omitempty"`
 	Systemd SystemdConfig  `json:"systemd,omitempty"`
@@ -34,8 +34,8 @@ type Pouchfile struct {
 
 type VaultConfig struct {
 	Address  string `json:"address,omitempty"`
-	RoleID   string `json:"roleID,omitempty"`
-	SecretID string `json:"secretID,omitempty"`
+	RoleID   string `json:"role_id,omitempty"`
+	SecretID string `json:"secret_id,omitempty"`
 	Token    string `json:"token,omitempty"`
 }
 
@@ -46,12 +46,12 @@ type SystemdConfig struct {
 
 	// AutoRestarts services requiring pouch when new keys are
 	// obtained
-	AutoRestart *bool `json:"autoRestart,omitempty"`
+	AutoRestart *bool `json:"auto_restart,omitempty"`
 }
 
 type SecretConfig struct {
-	VaultURL   string                 `json:"vaultURL,omitempty"`
-	HTTPMethod string                 `json:"httpMethod,omitempty"`
+	VaultURL   string                 `json:"vault_url,omitempty"`
+	HTTPMethod string                 `json:"http_method,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`
 	Files      []FileConfig           `json:"files,omitempty"`
 }
@@ -59,7 +59,7 @@ type SecretConfig struct {
 type FileConfig struct {
 	Path         string `json:"path,omitempty"`
 	Template     string `json:"template,omitempty"`
-	TemplateFile string `json:"templateFile,omitempty"`
+	TemplateFile string `json:"template_file,omitempty"`
 }
 
 func LoadPouchfile(path string) (*Pouchfile, error) {

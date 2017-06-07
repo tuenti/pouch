@@ -23,18 +23,18 @@ import (
 
 var casePouchfiles = []string{
 	`
-wrappedSecretIDPath: /var/run/vault_token
+wrapped_secret_id_path: /var/run/vault_token
 vault:
   address: http://127.0.0.1:8200
-  roleID: kubelet
-  secretID: ""
+  role_id: kubelet
+  secret_id: ""
   token: ""
 systemd:
   enabled: true
-  autoRestart: false
+  auto_restart: false
 secrets:
-- vaultURL: /v1/kubernetes-pki/issue/kubelet
-  httpMethod: POST
+- vault_url: /v1/kubernetes-pki/issue/kubelet
+  http_method: POST
   files:
   - path: /etc/kubernetes/ssl/client.key
     template: |
@@ -47,18 +47,18 @@ secrets:
       {{ .issuing_ca }}
 `,
 	`
-wrappedSecretIDPath: /var/run/vault_token
+wrapped_secret_id_path: /var/run/vault_token
 vault:
   address: http://127.0.0.1:8200
-  roleID: kubelet
-  secretID: ""
+  role_id: kubelet
+  secret_id: ""
   token: ""
 systemd:
   enabled: true
-  autoRestart: false
+  auto_restart: false
 secrets:
-- vaultURL: /v1/pki/issue/nginx
-  httpMethod: POST
+- vault_url: /v1/pki/issue/nginx
+  http_method: POST
   files:
   - path: /etc/nginx/ssl/bundle.crt
     template: |
@@ -71,19 +71,19 @@ secrets:
 }
 
 var wrongPouchfile = `
-wrappedSecretIDPath: /var/run/vault_token
+wrapped_secret_id_path: /var/run/vault_token
 vault:
   address: http://127.0.0.1:8200
-  roleID: kubelet
-  secretID: ""
+  role_id: kubelet
+  secret_id: ""
   token: ""
-  unknownField: "wrong"
+  unknown_field: "wrong"
 systemd:
   enabled: true
-  autoRestart: false
+  auto_restart: false
 secrets:
-- vaultURL: /v1/kubernetes-pki/issue/kubelet
-  httpMethod: POST
+- vault_url: /v1/kubernetes-pki/issue/kubelet
+  http_method: POST
 `
 
 func TestLoadPouchfile(t *testing.T) {
