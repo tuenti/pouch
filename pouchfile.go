@@ -57,8 +57,9 @@ type SecretConfig struct {
 }
 
 type FileConfig struct {
-	Path     string `json:"path,omitempty"`
-	Template string `json:"template,omitempty"`
+	Path         string `json:"path,omitempty"`
+	Template     string `json:"template,omitempty"`
+	TemplateFile string `json:"templateFile,omitempty"`
 }
 
 func LoadPouchfile(path string) (*Pouchfile, error) {

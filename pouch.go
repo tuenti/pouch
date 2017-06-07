@@ -51,6 +51,34 @@ type pouch struct {
 	autoReloaders   []AutoReloader
 }
 
+func getFileContent(fc FileConfig, data interface{}) (string, error) {
+	if fc.Template != "" && fc.TemplateFile != "" {
+		return "", fmt.Errorf("inline template and template file specified")
+	}
+	var t *template.Template
+	var err error
+	switch {
+	case fc.Template != "":
+		t, err = template.New("file").Parse(fc.Template)
+		if err != nil {
+			return "", err
+		}
+	case fc.TemplateFile != "":
+		t, err = template.ParseFiles(fc.TemplateFile)
+		if err != nil {
+			return "", err
+		}
+	default:
+		return "", fmt.Errorf("no content defined for file")
+	}
+	var b bytes.Buffer
+	err = t.Execute(&b, data)
+	if err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
 func (p *pouch) Run() error {
 	err := p.Vault.Login()
 	if err != nil {
@@ -69,18 +97,9 @@ func (p *pouch) Run() error {
 				return err
 			}
 
-			var content string
-			if fc.Template != "" {
-				t, err := template.New("file").Parse(fc.Template)
-				if err != nil {
-					return err
-				}
-				var b bytes.Buffer
-				err = t.Execute(&b, s.Data)
-				if err != nil {
-					return err
-				}
-				content = b.String()
+			content, err := getFileContent(fc, s.Data)
+			if err != nil {
+				return err
 			}
 
 			err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
