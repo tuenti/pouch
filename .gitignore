@@ -1,6 +1,4 @@
-/pouch
-/pouchctl
-/terraform-provisioner-vault-secret-id
+/bin
 .vagrant
 *.docker
 *.aci
