@@ -23,12 +23,12 @@ This workflow has some advantages:
 
 ## Tools in the pouch project
 
-* [`pouch`](http://github.com/tuenti/cmd/pouch) is a daemon able to login with
+* [`pouch`](https://github.com/tuenti/pouch/tree/master/cmd/pouch) is a daemon able to login with
   Vault using AppRole authentication method with wrapped secret IDs, it can
   request secrets and use them to fill templates.
-* [`pouchctl`](http://github.com/tuenti/cmd/pouchctl) is a cli tool that can be
+* [`pouchctl`](https://github.com/tuenti/pouch/tree/master/cmd/pouchctl) is a cli tool that can be
   used to push wrapped secret ids to hosts using `pouch`.
-* [`terraform-provisioner-vault-secret-id`](http://github.com/tuenti/cmd/pouchctl)
+* [`terraform-provisioner-vault-secret-id`](https://github.com/tuenti/pouch/tree/master/cmd/terraform-provisioner-vault-secret-id)
   is a Terraform plugin that provides a provisioner that can be used to push wrapped
   secret ids to hosts using `pouch`.
 
