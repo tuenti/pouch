@@ -75,10 +75,11 @@ resource "null_resource" "vault-test-secret-id" {
 
   provisioner "vault-secret-id" {
     role = "testrole"
-	wrap_ttl = "30s"
+    wrap_ttl = "30s"
     destination = "/var/run/wrapped-secret-id"
   }
 }
+```
 
 Connection with Vault can be configured as usual using environment variables
 `VAULT_ADDR` and `VAULT_TOKEN`.
