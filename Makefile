@@ -17,7 +17,7 @@ aci: $(DOCKER_IMAGE_FILE)
 test:
 	go test . ./cmd/...
 
-bins: bin/pouch bin/pouchctl bin/terraform-provisioner-vault-secret-id
+bins: bin/pouch bin/pouchctl bin/terraform-provisioner-vault-secret-id bin/approle-login
 
 bin/%: cmd/%/
 	go build -ldflags "-X main.version=$(VERSION)" -o $@ -i ./$<

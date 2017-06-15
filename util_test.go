@@ -156,3 +156,7 @@ func (v *DummyVault) Request(method, urlPath string, options *VaultRequestOption
 	}
 	return s, nil
 }
+
+func (v *DummyVault) GetToken() string {
+	return v.Token
+}

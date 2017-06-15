@@ -44,6 +44,7 @@ type Vault interface {
 	Login() error
 	Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error)
 	UnwrapSecretID(token string) error
+	GetToken() string
 }
 
 type vaultApi struct {
@@ -147,4 +148,8 @@ func (v *vaultApi) Request(method, urlPath string, options *VaultRequestOptions)
 		return nil, nil
 	}
 	return api.ParseSecret(resp.Body)
+}
+
+func (v *vaultApi) GetToken() string {
+	return v.Token
 }
