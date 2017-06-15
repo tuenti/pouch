@@ -63,8 +63,6 @@ func main() {
 	var address, token string
 	var showVersion, genSecret, showRoleId bool
 
-	flag.NewFlagSet("foo", flag.ContinueOnError)
-
 	flag.StringVar(&destination, "copy-to", "", "Destination for the wrapped secret")
 	flag.StringVar(&role, "role", "", "Role to request a secret from")
 	flag.StringVar(&wrapTTL, "wrap-ttl", "60s", "TTL for the wrapped secret ID")
