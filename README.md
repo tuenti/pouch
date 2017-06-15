@@ -31,6 +31,9 @@ This workflow has some advantages:
 * [`terraform-provisioner-vault-secret-id`](https://github.com/tuenti/pouch/tree/master/cmd/terraform-provisioner-vault-secret-id)
   is a Terraform plugin that provides a provisioner that can be used to push wrapped
   secret ids to hosts using `pouch`.
+* [`approle-login`](https://github.com/tuenti/pouch/tree/master/cmd/approle-login) is a helper tool
+  that can be used with other tools that use Vault as data source but don't implement the AppRole
+  authentication backend.
 
 ## Credits & Contact
 
