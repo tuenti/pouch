@@ -1,18 +1,30 @@
 VERSION := 0.2.1
-DOCKER_REPOSITORY := tuenti/pouch
+
+BASE_DOCKER_REPOSITORY := tuenti
+
+DOCKER_REPOSITORY := $(BASE_DOCKER_REPOSITORY)/pouch
 DOCKER_TAG := $(DOCKER_REPOSITORY):$(VERSION)
 DOCKER_IMAGE_FILE := $(subst /,-,$(DOCKER_REPOSITORY))-$(VERSION).docker
+
+APPROLE_DOCKER_REPOSITORY := $(BASE_DOCKER_REPOSITORY)/approle-login
+APPROLE_LOGIN_DOCKER_TAG := $(APPROLE_DOCKER_REPOSITORY):$(VERSION)
+APPROLE_IMAGE_FILE := $(subst /,-,$(APPROLE_DOCKER_REPOSITORY))-$(VERSION).docker
 
 all: test bins docker aci
 
 docker:
 	docker build --build-arg version=$(VERSION) -t $(DOCKER_TAG) .
+	docker build --build-arg version=$(VERSION) -t $(APPROLE_LOGIN_DOCKER_TAG) -f Dockerfile.approle-login .
 
 $(DOCKER_IMAGE_FILE): docker
 	docker save $(DOCKER_TAG) -o $(DOCKER_IMAGE_FILE)
 
-aci: $(DOCKER_IMAGE_FILE)
+$(APPROLE_IMAGE_FILE): docker
+	docker save $(APPROLE_LOGIN_DOCKER_TAG) -o $(APPROLE_IMAGE_FILE)
+
+aci: $(DOCKER_IMAGE_FILE) $(APPROLE_IMAGE_FILE)
 	docker2aci $(DOCKER_IMAGE_FILE)
+	docker2aci $(APPROLE_IMAGE_FILE)
 
 test:
 	go test -tags testutils . ./pkg/... ./cmd/...
