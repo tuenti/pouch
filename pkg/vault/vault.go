@@ -111,6 +111,9 @@ func (v *vaultApi) UnwrapSecretID(token string) error {
 	if err != nil {
 		return err
 	}
+	if resp == nil {
+		return fmt.Errorf("no response?")
+	}
 	secretID, ok := resp.Data["secret_id"]
 	if !ok {
 		return fmt.Errorf("no secret ID found in response")
