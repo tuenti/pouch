@@ -24,6 +24,8 @@ import (
 	"os"
 	"path"
 	"text/template"
+
+	"github.com/tuenti/pouch/pkg/vault"
 )
 
 type Pouch interface {
@@ -44,7 +46,7 @@ type AutoReloader interface {
 }
 
 type pouch struct {
-	Vault   Vault
+	Vault   vault.Vault
 	Secrets []SecretConfig
 
 	statusNotifiers []StatusNotifier
@@ -85,7 +87,7 @@ func (p *pouch) Run() error {
 		return err
 	}
 	for _, c := range p.Secrets {
-		options := &VaultRequestOptions{Data: c.Data}
+		options := &vault.RequestOptions{Data: c.Data}
 		s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
 		if err != nil {
 			return err
@@ -112,7 +114,7 @@ func (p *pouch) Run() error {
 	return nil
 }
 
-func NewPouch(v Vault, s []SecretConfig) Pouch {
+func NewPouch(v vault.Vault, s []SecretConfig) Pouch {
 	return &pouch{Vault: v, Secrets: s}
 }
 

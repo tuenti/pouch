@@ -23,14 +23,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tuenti/pouch/pkg/vault"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPouchRun(t *testing.T) {
-	vault := &DummyVault{
-		t: t,
+	v := &vault.DummyVault{
+		T: t,
 
 		ExpectedToken:    "token",
 		ExpectedSecretID: "secret",
@@ -60,7 +62,7 @@ func TestPouchRun(t *testing.T) {
 		},
 	}
 
-	pouch := NewPouch(vault, secrets)
+	pouch := NewPouch(v, secrets)
 
 	err = pouch.Run()
 	if err != nil {
@@ -93,8 +95,8 @@ func TestPouchWatch(t *testing.T) {
 	}
 	defer os.RemoveAll(secretWrapPath.Name())
 
-	vault := &DummyVault{
-		t: t,
+	v := &vault.DummyVault{
+		T: t,
 
 		ExpectedToken:    "token",
 		ExpectedSecretID: "secret",
@@ -118,7 +120,7 @@ func TestPouchWatch(t *testing.T) {
 		},
 	}
 
-	pouch := NewPouch(vault, secrets)
+	pouch := NewPouch(v, secrets)
 
 	w, err := fsnotify.NewWatcher()
 	if err != nil {

@@ -23,7 +23,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/tuenti/pouch"
+	"github.com/tuenti/pouch/pkg/vault"
 )
 
 var version = "dev"
@@ -83,13 +83,13 @@ func main() {
 		os.Exit(-1)
 	}
 
-	vault := pouch.NewVault(pouch.VaultConfig{
+	v := vault.New(vault.Config{
 		Address: address,
 		Token:   token,
 	})
 
 	if showRoleId {
-		s, err := vault.Request("GET", path.Join(pouch.AppRoleURL, role, "role-id"), nil)
+		s, err := v.Request("GET", path.Join(vault.AppRoleURL, role, "role-id"), nil)
 		if err != nil {
 			fmt.Printf("Couldn't get role ID: %s\n", err)
 			os.Exit(-1)
@@ -110,8 +110,8 @@ func main() {
 		os.Exit(-1)
 	}
 
-	options := pouch.VaultRequestOptions{WrapTTL: wrapTTL}
-	s, err := vault.Request("POST", path.Join(pouch.AppRoleURL, role, "secret-id"), &options)
+	options := vault.RequestOptions{WrapTTL: wrapTTL}
+	s, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
 	if err != nil {
 		fmt.Printf("Couldn't get wrapped secret ID: %s\n", err)
 		os.Exit(-1)

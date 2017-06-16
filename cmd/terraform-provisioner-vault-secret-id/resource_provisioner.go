@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tuenti/pouch"
+	"github.com/tuenti/pouch/pkg/vault"
 
 	"github.com/hashicorp/terraform/communicator"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -112,15 +112,15 @@ func applyFn(ctx context.Context) error {
 
 	address := data.Get("address").(string)
 	token := data.Get("token").(string)
-	vault := pouch.NewVault(pouch.VaultConfig{
+	v := vault.New(vault.Config{
 		Address: address,
 		Token:   token,
 	})
 
 	role := data.Get("role").(string)
 	wrapTTL := data.Get("wrap_ttl").(string)
-	options := pouch.VaultRequestOptions{WrapTTL: wrapTTL}
-	s, err := vault.Request("POST", path.Join(pouch.AppRoleURL, role, "secret-id"), &options)
+	options := vault.RequestOptions{WrapTTL: wrapTTL}
+	s, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
 	if err != nil {
 		return fmt.Errorf("couldn't get wrapped secret ID: %s", err)
 	}

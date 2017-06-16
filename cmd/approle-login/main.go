@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tuenti/pouch"
+	"github.com/tuenti/pouch/pkg/vault"
 )
 
 var version = "dev"
@@ -51,7 +51,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	vault := pouch.NewVault(pouch.VaultConfig{
+	v := vault.New(vault.Config{
 		Address:  address,
 		RoleID:   roleId,
 		SecretID: secretId,
@@ -63,20 +63,20 @@ func main() {
 			fmt.Println("Couldn't read wrapped secret Id")
 			os.Exit(-1)
 		}
-		err = vault.UnwrapSecretID(strings.TrimSpace(string(d)))
+		err = v.UnwrapSecretID(strings.TrimSpace(string(d)))
 		if err != nil {
 			fmt.Printf("Couldn't unwrap secret ID: %s\n", err)
 			os.Exit(-1)
 		}
 	}
 
-	err := vault.Login()
+	err := v.Login()
 	if err != nil {
 		fmt.Printf("Couldn't login to vault with provided credentials: %s\n", err)
 		os.Exit(-1)
 	}
 
-	token := vault.GetToken()
+	token := v.GetToken()
 	f := os.Stdout
 	if output != "" {
 		f, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)

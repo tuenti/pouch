@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pouch
+package vault
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ const (
 	AppRoleURL      = "/v1/auth/approle/role"
 )
 
-type VaultRequestOptions struct {
+type RequestOptions struct {
 	WrapTTL string
 
 	Data map[string]interface{}
@@ -42,9 +42,16 @@ type VaultRequestOptions struct {
 
 type Vault interface {
 	Login() error
-	Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error)
+	Request(method, urlPath string, options *RequestOptions) (*api.Secret, error)
 	UnwrapSecretID(token string) error
 	GetToken() string
+}
+
+type Config struct {
+	Address  string `json:"address,omitempty"`
+	RoleID   string `json:"role_id,omitempty"`
+	SecretID string `json:"secret_id,omitempty"`
+	Token    string `json:"token,omitempty"`
 }
 
 type vaultApi struct {
@@ -54,7 +61,7 @@ type vaultApi struct {
 	Token    string
 }
 
-func NewVault(c VaultConfig) Vault {
+func New(c Config) Vault {
 	return &vaultApi{
 		Address:  c.Address,
 		RoleID:   c.RoleID,
@@ -83,7 +90,7 @@ func (v *vaultApi) Login() error {
 	if v.SecretID != "" {
 		data["secret_id"] = v.SecretID
 	}
-	options := VaultRequestOptions{Data: data}
+	options := RequestOptions{Data: data}
 	resp, err := v.Request(http.MethodPost, AppRoleLoginURL, &options)
 	if err != nil {
 		return err
@@ -115,7 +122,7 @@ func (v *vaultApi) UnwrapSecretID(token string) error {
 	return nil
 }
 
-func (v *vaultApi) Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error) {
+func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*api.Secret, error) {
 	c, err := v.getClient()
 	if err != nil {
 		return nil, err

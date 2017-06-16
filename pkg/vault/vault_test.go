@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pouch
+package vault
 
 import (
 	"path"
@@ -81,7 +81,7 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 		Token:   token,
 	}
 	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
-	s, err := admin.Request("POST", secretIDURL, &VaultRequestOptions{
+	s, err := admin.Request("POST", secretIDURL, &RequestOptions{
 		WrapTTL: "10s",
 	})
 	if err != nil {

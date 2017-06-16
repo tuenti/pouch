@@ -21,22 +21,17 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/tuenti/pouch/pkg/vault"
+
 	"github.com/ghodss/yaml"
 )
 
 type Pouchfile struct {
 	WrappedSecretIDPath string `json:"wrapped_secret_id_path,omitempty"`
 
-	Vault   VaultConfig    `json:"vault,omitempty"`
+	Vault   vault.Config   `json:"vault,omitempty"`
 	Systemd SystemdConfig  `json:"systemd,omitempty"`
 	Secrets []SecretConfig `json:"secrets,omitempty"`
-}
-
-type VaultConfig struct {
-	Address  string `json:"address,omitempty"`
-	RoleID   string `json:"role_id,omitempty"`
-	SecretID string `json:"secret_id,omitempty"`
-	Token    string `json:"token,omitempty"`
 }
 
 type SystemdConfig struct {

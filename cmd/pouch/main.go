@@ -24,6 +24,7 @@ import (
 
 	"github.com/tuenti/pouch"
 	"github.com/tuenti/pouch/pkg/systemd"
+	"github.com/tuenti/pouch/pkg/vault"
 )
 
 var version = "dev"
@@ -47,7 +48,7 @@ func main() {
 		log.Fatalf("Couldn't load Pouchfile: %v", err)
 	}
 
-	vault := pouch.NewVault(pouchfile.Vault)
+	vault := vault.New(pouchfile.Vault)
 
 	p := pouch.NewPouch(vault, pouchfile.Secrets)
 

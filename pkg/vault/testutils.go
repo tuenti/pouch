@@ -1,3 +1,5 @@
+// +build testutils
+
 /*
 Copyright 2017 Tuenti Technologies S.L. All rights reserved.
 
@@ -14,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pouch
+package vault
 
 import (
 	"path"
@@ -27,11 +29,11 @@ import (
 	"github.com/hashicorp/vault/helper/logformat"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/physical"
-	"github.com/hashicorp/vault/vault"
+	v "github.com/hashicorp/vault/vault"
 )
 
 // Based on TestCores on github.com/hashicorp/vault
-func NewTestCoreAppRole(t *testing.T) (*vault.Core, [][]byte, string) {
+func NewTestCoreAppRole(t *testing.T) (*v.Core, [][]byte, string) {
 	logLevel := log.LevelError
 	if testing.Verbose() {
 		logLevel = log.LevelTrace
@@ -42,17 +44,17 @@ func NewTestCoreAppRole(t *testing.T) (*vault.Core, [][]byte, string) {
 	credentialBackends := make(map[string]logical.Factory)
 	credentialBackends["approle"] = approle.Factory
 
-	conf := &vault.CoreConfig{
+	conf := &v.CoreConfig{
 		Physical:           physicalBackend,
 		CredentialBackends: credentialBackends,
 		DisableMlock:       true,
 		Logger:             logger,
 	}
-	core, err := vault.NewCore(conf)
+	core, err := v.NewCore(conf)
 
-	keys, token := vault.TestCoreInit(t, core)
+	keys, token := v.TestCoreInit(t, core)
 	for _, key := range keys {
-		if _, err := vault.TestCoreUnseal(core, vault.TestKeyCopy(key)); err != nil {
+		if _, err := v.TestCoreUnseal(core, v.TestKeyCopy(key)); err != nil {
 			t.Fatalf("unseal err: %s", err)
 		}
 	}
@@ -77,7 +79,7 @@ func setupAppRole(t *testing.T, name, token, address string, secret bool) string
 		Address: address,
 		Token:   token,
 	}
-	options := VaultRequestOptions{
+	options := RequestOptions{
 		Data: map[string]interface{}{"type": "approle"},
 	}
 	_, err := v.Request("POST", AuthAppRoleURL, &options)
@@ -91,7 +93,7 @@ func setupAppRole(t *testing.T, name, token, address string, secret bool) string
 		roleParams["bind_secret_id"] = "false"
 		roleParams["bound_cidr_list"] = "127.0.0.0/8"
 	}
-	options = VaultRequestOptions{Data: roleParams}
+	options = RequestOptions{Data: roleParams}
 	_, err = v.Request("POST", roleURL, &options)
 	if err != nil {
 		t.Fatalf("couldn't create approle testrole: %s ", err)
@@ -109,7 +111,7 @@ func setupAppRole(t *testing.T, name, token, address string, secret bool) string
 }
 
 type DummyVault struct {
-	t *testing.T
+	T *testing.T
 
 	ExpectedToken    string
 	ExpectedSecretID string
@@ -127,10 +129,10 @@ func (v *DummyVault) Login() error {
 		return nil
 	}
 	if v.RoleID == "" {
-		v.t.Fatalf("unset roleID")
+		v.T.Fatalf("unset roleID")
 	}
 	if v.SecretID != v.ExpectedSecretID {
-		v.t.Fatalf("incorrect secretID")
+		v.T.Fatalf("incorrect secretID")
 	}
 	v.Token = v.ExpectedToken
 	return nil
@@ -138,21 +140,21 @@ func (v *DummyVault) Login() error {
 
 func (v *DummyVault) UnwrapSecretID(token string) error {
 	if token != v.WrappedSecretID {
-		v.t.Fatalf("incorrect wrapped secret ID")
+		v.T.Fatalf("incorrect wrapped secret ID")
 	}
 	v.SecretID = v.ExpectedSecretID
 	v.WrappedSecretID = ""
 	return nil
 }
 
-func (v *DummyVault) Request(method, urlPath string, options *VaultRequestOptions) (*api.Secret, error) {
+func (v *DummyVault) Request(method, urlPath string, options *RequestOptions) (*api.Secret, error) {
 	if v.Token != v.ExpectedToken {
-		v.t.Fatalf("incorrect token on request")
+		v.T.Fatalf("incorrect token on request")
 	}
 	k := method + urlPath
 	s, ok := v.Responses[k]
 	if !ok {
-		v.t.Fatalf("incorrect response")
+		v.T.Fatalf("incorrect response")
 	}
 	return s, nil
 }

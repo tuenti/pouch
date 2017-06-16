@@ -15,7 +15,7 @@ aci: $(DOCKER_IMAGE_FILE)
 	docker2aci $(DOCKER_IMAGE_FILE)
 
 test:
-	go test . ./cmd/...
+	go test -tags testutils . ./pkg/... ./cmd/...
 
 bins: bin/pouch bin/pouchctl bin/terraform-provisioner-vault-secret-id bin/approle-login
 
