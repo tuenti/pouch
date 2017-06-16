@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pouch
+package systemd
 
 import (
 	"fmt"
@@ -33,20 +33,26 @@ type SystemD interface {
 	UnitName() (string, error)
 	Close()
 
-	StatusNotifier
-	AutoReloader
+	AutoReload() error
+	NotifyReload() error
+	NotifyReady() error
 }
 
-func NewSystemd(c SystemdConfig) SystemD {
+type SystemdConfigurer interface {
+	Enabled() bool
+	AutoRestart() bool
+}
+
+func New(c SystemdConfigurer) SystemD {
 	return &systemd{
-		enabled:     c.Enabled,
-		autoRestart: c.AutoRestart,
+		enabled:     c.Enabled(),
+		autoRestart: c.AutoRestart(),
 	}
 }
 
 type systemd struct {
-	enabled     *bool
-	autoRestart *bool
+	enabled     bool
+	autoRestart bool
 
 	name string
 }
@@ -71,7 +77,7 @@ func (s *systemd) UnitName() (string, error) {
 }
 
 func (s *systemd) IsAvailable() bool {
-	if s.enabled != nil && !*s.enabled {
+	if !s.enabled {
 		return false
 	}
 
@@ -133,7 +139,7 @@ func (s *systemd) NotifyReload() error {
 }
 
 func (s *systemd) AutoReload() error {
-	if s.autoRestart == nil || !*s.autoRestart {
+	if !s.autoRestart {
 		return nil
 	}
 

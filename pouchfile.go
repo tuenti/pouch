@@ -45,8 +45,28 @@ type SystemdConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// AutoRestarts services requiring pouch when new keys are
-	// obtained
+	// obtained, disabled by default
 	AutoRestart *bool `json:"auto_restart,omitempty"`
+}
+
+type systemdConfigurer struct {
+	enabled     bool
+	autoRestart bool
+}
+
+func (c *systemdConfigurer) Enabled() bool {
+	return c.enabled
+}
+
+func (c *systemdConfigurer) AutoRestart() bool {
+	return c.autoRestart
+}
+
+func (s *SystemdConfig) Configurer() *systemdConfigurer {
+	return &systemdConfigurer{
+		enabled:     s.Enabled == nil || *s.Enabled,
+		autoRestart: s.AutoRestart != nil && *s.AutoRestart,
+	}
 }
 
 type SecretConfig struct {

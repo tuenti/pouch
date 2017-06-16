@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"github.com/tuenti/pouch"
+	"github.com/tuenti/pouch/pkg/systemd"
 )
 
 var version = "dev"
@@ -50,7 +51,7 @@ func main() {
 
 	p := pouch.NewPouch(vault, pouchfile.Secrets)
 
-	systemd := pouch.NewSystemd(pouchfile.Systemd)
+	systemd := systemd.New(pouchfile.Systemd.Configurer())
 	if systemd.IsAvailable() {
 		p.AddAutoReloader(systemd)
 		if systemd.CanNotify() {
