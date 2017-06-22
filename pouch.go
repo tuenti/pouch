@@ -22,7 +22,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 	"text/template"
 
 	"github.com/tuenti/pouch/pkg/vault"
@@ -86,32 +88,42 @@ func (p *pouch) Run() error {
 	if err != nil {
 		return err
 	}
-	for _, c := range p.Secrets {
-		options := &vault.RequestOptions{Data: c.Data}
-		s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
-		if err != nil {
-			return err
+
+	sigHup := make(chan os.Signal, 1)
+	signal.Notify(sigHup, syscall.SIGHUP)
+
+	for {
+		for _, c := range p.Secrets {
+			options := &vault.RequestOptions{Data: c.Data}
+			s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+			if err != nil {
+				return err
+			}
+			for _, fc := range c.Files {
+				dir := path.Dir(fc.Path)
+				err := os.MkdirAll(dir, 0700)
+				if err != nil {
+					return err
+				}
+
+				content, err := getFileContent(fc, s.Data)
+				if err != nil {
+					return err
+				}
+
+				err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
+				if err != nil {
+					return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
+				}
+			}
 		}
-		for _, fc := range c.Files {
-			dir := path.Dir(fc.Path)
-			err := os.MkdirAll(dir, 0700)
-			if err != nil {
-				return err
-			}
+		p.AutoRestart()
+		p.NotifyReady()
 
-			content, err := getFileContent(fc, s.Data)
-			if err != nil {
-				return err
-			}
-
-			err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
-			if err != nil {
-				return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
-			}
+		select {
+		case <-sigHup:
 		}
 	}
-	p.NotifyReady()
-	return nil
 }
 
 func NewPouch(v vault.Vault, s []SecretConfig) Pouch {

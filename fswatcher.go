@@ -18,7 +18,6 @@ package pouch
 
 import (
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -34,14 +33,15 @@ func (p *pouch) handleWrapped(path string) error {
 	if err != nil {
 		return err
 	}
-	err = p.Run()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func (p *pouch) Watch(path string) error {
+	// If the file is here, we are done, try before watching
+	if err := p.handleWrapped(path); err == nil {
+		return nil
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -49,39 +49,25 @@ func (p *pouch) Watch(path string) error {
 	defer watcher.Close()
 
 	dir := filepath.Dir(path)
-
-	p.handleWrapped(path)
-
-	errors := make(chan error)
-	go func() {
-		for {
-			select {
-			case event := <-watcher.Events:
-				if event.Name == path && event.Op&fsnotify.Write != 0 {
-					p.NotifyReload()
-					err := p.handleWrapped(path)
-					if err != nil {
-						errors <- err
-						return
-					}
-					p.AutoRestart()
-				}
-			case err := <-watcher.Errors:
-				errors <- err
-				return
-			}
-		}
-	}()
-
-	if !p.PendingSecrets() {
-		log.Println("No pending secrets, we are ready")
-		p.NotifyReady()
-	}
-
 	err = watcher.Add(dir)
 	if err != nil {
 		return err
 	}
 
-	return <-errors
+	for {
+		select {
+		case event := <-watcher.Events:
+			if event.Name == path && event.Op&fsnotify.Write != 0 {
+				p.NotifyReload()
+				err := p.handleWrapped(path)
+				if err != nil {
+					return err
+				}
+			}
+		case err := <-watcher.Errors:
+			return err
+		}
+	}
+
+	return nil
 }

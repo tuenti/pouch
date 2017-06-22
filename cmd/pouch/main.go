@@ -63,9 +63,12 @@ func main() {
 
 	if pouchfile.WrappedSecretIDPath != "" {
 		err = p.Watch(pouchfile.WrappedSecretIDPath)
-	} else {
-		err = p.Run()
+		if err != nil {
+			log.Fatal("Couldn't obtain secret ID from %s: %v", pouchfile.WrappedSecretIDPath, err)
+		}
 	}
+
+	err = p.Run()
 	if err != nil {
 		log.Fatalf("Pouch failed: %v", err)
 	}
