@@ -122,6 +122,7 @@ func (p *pouch) Run() error {
 
 		select {
 		case <-sigHup:
+			p.NotifyReload()
 		}
 	}
 }

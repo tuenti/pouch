@@ -61,10 +61,11 @@ func main() {
 	}
 	defer systemd.Close()
 
-	if pouchfile.WrappedSecretIDPath != "" {
-		err = p.Watch(pouchfile.WrappedSecretIDPath)
+	if path := pouchfile.WrappedSecretIDPath; path != "" {
+		log.Printf("Waiting for a wrapped secret ID in %s", path)
+		err = p.Watch(path)
 		if err != nil {
-			log.Fatal("Couldn't obtain secret ID from %s: %v", pouchfile.WrappedSecretIDPath, err)
+			log.Fatalf("Couldn't obtain secret ID from %s: %v", path, err)
 		}
 	}
 

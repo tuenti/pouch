@@ -17,6 +17,7 @@ limitations under the License.
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -86,24 +87,24 @@ func (v *vaultApi) getClient() (*api.Client, error) {
 	return api.NewClient(config)
 }
 
-func (v *vaultApi) tokenTTL() (int, error) {
+func (v *vaultApi) tokenTTL() (int64, error) {
 	resp, err := v.Request(http.MethodGet, SelfTokenURL, nil)
 	if err != nil || resp == nil {
-		return 0, fmt.Errorf("couldn't obtain self token information: %s", err)
+		return 0, fmt.Errorf("couldn't obtain self token information: %v", err)
 	}
-	ttl, ok := resp.Data["ttl"].(int)
+	ttlNumber, ok := resp.Data["ttl"].(json.Number)
 	if !ok {
 		return 0, fmt.Errorf("couldn't obtain token TTL")
 	}
-	return ttl, nil
+	return ttlNumber.Int64()
 }
 
 func (v *vaultApi) autoRenewToken() {
-	var ttl int
+	var ttl int64
 	var err error
 
 	retry := func(attempts int, t time.Duration, f func() error) {
-		for attempt := 0; attempt < attempts; attempt-- {
+		for attempt := 0; attempt < attempts; attempt++ {
 			err = f()
 			if err == nil {
 				<-time.After(t)
@@ -118,7 +119,7 @@ func (v *vaultApi) autoRenewToken() {
 			return err
 		})
 		if err != nil {
-			log.Printf("Couldn't obtain token TTL: %s\n")
+			log.Printf("Couldn't obtain token TTL: %s\n", err)
 			break
 		}
 		if ttl == 0 {
@@ -126,6 +127,7 @@ func (v *vaultApi) autoRenewToken() {
 			return
 		}
 		period := time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
+		log.Printf("Next token renewal in %s", period)
 		<-time.After(period)
 		retry(5, 1*time.Second, func() error {
 			_, err = v.Request(http.MethodPost, SelfTokenRenewURL, nil)
