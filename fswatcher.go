@@ -17,6 +17,7 @@ limitations under the License.
 package pouch
 
 import (
+	"errors"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -24,10 +25,15 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+var isEmpty = errors.New("Empty wrapped secret ID file")
+
 func (p *pouch) handleWrapped(path string) error {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
+	}
+	if len(d) == 0 {
+		return isEmpty
 	}
 	err = p.Vault.UnwrapSecretID(strings.TrimSpace(string(d)))
 	if err != nil {
@@ -58,7 +64,11 @@ func (p *pouch) Watch(path string) error {
 		select {
 		case event := <-watcher.Events:
 			if event.Name == path && event.Op&fsnotify.Write != 0 {
-				return p.handleWrapped(path)
+				err = p.handleWrapped(path)
+				if err == isEmpty {
+					continue
+				}
+				return err
 			}
 		case err := <-watcher.Errors:
 			return err

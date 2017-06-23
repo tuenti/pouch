@@ -144,6 +144,7 @@ func (v *vaultApi) autoRenewToken() {
 
 func (v *vaultApi) Login() error {
 	if v.Token != "" {
+		go v.autoRenewToken()
 		return nil
 	}
 	if v.RoleID == "" {

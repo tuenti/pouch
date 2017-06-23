@@ -48,9 +48,18 @@ func main() {
 		log.Fatalf("Couldn't load Pouchfile: %v", err)
 	}
 
+	state, err := pouch.LoadState(pouchfile.StatePath)
+	if err == nil {
+		log.Printf("Using state stored in %s", pouchfile.StatePath)
+		pouchfile.Vault.Token = state.Token
+	} else {
+		log.Printf("Couldn't load state: %s, starting from scratch", err)
+		state = pouch.NewState(pouchfile.StatePath)
+	}
+
 	vault := vault.New(pouchfile.Vault)
 
-	p := pouch.NewPouch(vault, pouchfile.Secrets)
+	p := pouch.NewPouch(state, vault, pouchfile.Secrets)
 
 	systemd := systemd.New(pouchfile.Systemd.Configurer())
 	if systemd.IsAvailable() {
@@ -61,7 +70,7 @@ func main() {
 	}
 	defer systemd.Close()
 
-	if path := pouchfile.WrappedSecretIDPath; path != "" {
+	if path := pouchfile.WrappedSecretIDPath; state.Token == "" && path != "" {
 		log.Printf("Waiting for a wrapped secret ID in %s", path)
 		err = p.Watch(path)
 		if err != nil {

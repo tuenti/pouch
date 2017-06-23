@@ -28,6 +28,7 @@ import (
 
 type Pouchfile struct {
 	WrappedSecretIDPath string `json:"wrapped_secret_id_path,omitempty"`
+	StatePath           string `json:"state_path,omitempty"`
 
 	Vault   vault.Config   `json:"vault,omitempty"`
 	Systemd SystemdConfig  `json:"systemd,omitempty"`

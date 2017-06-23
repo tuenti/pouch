@@ -33,7 +33,6 @@ import (
 type Pouch interface {
 	Run() error
 	Watch(path string) error
-	PendingSecrets() bool
 	AddStatusNotifier(StatusNotifier)
 	AddAutoReloader(AutoReloader)
 }
@@ -48,6 +47,8 @@ type AutoReloader interface {
 }
 
 type pouch struct {
+	State *PouchState
+
 	Vault   vault.Vault
 	Secrets []SecretConfig
 
@@ -88,6 +89,7 @@ func (p *pouch) Run() error {
 	if err != nil {
 		return err
 	}
+	p.State.Token = p.Vault.GetToken()
 
 	sigHup := make(chan os.Signal, 1)
 	signal.Notify(sigHup, syscall.SIGHUP)
@@ -120,6 +122,11 @@ func (p *pouch) Run() error {
 		p.AutoRestart()
 		p.NotifyReady()
 
+		err = p.State.Save()
+		if err != nil {
+			log.Printf("Couldn't save state: %s", err)
+		}
+
 		select {
 		case <-sigHup:
 			p.NotifyReload()
@@ -127,19 +134,8 @@ func (p *pouch) Run() error {
 	}
 }
 
-func NewPouch(v vault.Vault, s []SecretConfig) Pouch {
-	return &pouch{Vault: v, Secrets: s}
-}
-
-func (p *pouch) PendingSecrets() bool {
-	for _, c := range p.Secrets {
-		for _, fc := range c.Files {
-			if _, err := os.Stat(fc.Path); os.IsNotExist(err) {
-				return true
-			}
-		}
-	}
-	return false
+func NewPouch(s *PouchState, vc vault.Vault, sc []SecretConfig) Pouch {
+	return &pouch{State: s, Vault: vc, Secrets: sc}
 }
 
 func (p *pouch) AddStatusNotifier(n StatusNotifier) {
