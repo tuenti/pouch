@@ -30,9 +30,10 @@ type Pouchfile struct {
 	WrappedSecretIDPath string `json:"wrapped_secret_id_path,omitempty"`
 	StatePath           string `json:"state_path,omitempty"`
 
-	Vault   vault.Config   `json:"vault,omitempty"`
-	Systemd SystemdConfig  `json:"systemd,omitempty"`
-	Secrets []SecretConfig `json:"secrets,omitempty"`
+	Vault     vault.Config              `json:"vault,omitempty"`
+	Systemd   SystemdConfig             `json:"systemd,omitempty"`
+	Notifiers map[string]NotifierConfig `json:"notifiers,omitempty"`
+	Secrets   []SecretConfig            `json:"secrets,omitempty"`
 }
 
 type SystemdConfig struct {
@@ -64,9 +65,15 @@ type SecretConfig struct {
 }
 
 type FileConfig struct {
-	Path         string `json:"path,omitempty"`
-	Template     string `json:"template,omitempty"`
-	TemplateFile string `json:"template_file,omitempty"`
+	Path         string   `json:"path,omitempty"`
+	Template     string   `json:"template,omitempty"`
+	TemplateFile string   `json:"template_file,omitempty"`
+	Notify       []string `json:"notify,omitempty"`
+}
+
+type NotifierConfig struct {
+	Command string `json:"command,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
 }
 
 func LoadPouchfile(path string) (*Pouchfile, error) {

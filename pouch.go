@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"text/template"
 	"time"
@@ -30,11 +31,14 @@ import (
 	"github.com/tuenti/pouch/pkg/vault"
 )
 
+const (
+	DefaultNotifyTimeout = 5 * time.Minute
+)
+
 type Pouch interface {
 	Run(context.Context) error
 	Watch(path string) error
 	AddStatusNotifier(StatusNotifier)
-	AddReloader(Reloader)
 }
 
 type StatusNotifier interface {
@@ -48,11 +52,12 @@ type Reloader interface {
 type pouch struct {
 	State *PouchState
 
-	Vault   vault.Vault
-	Secrets []SecretConfig
+	Vault     vault.Vault
+	Secrets   []SecretConfig
+	Notifiers map[string]NotifierConfig
 
-	statusNotifiers []StatusNotifier
-	reloaders       []Reloader
+	statusNotifiers  []StatusNotifier
+	pendingNotifiers map[string]bool
 }
 
 func getFileContent(fc FileConfig, data interface{}) (string, error) {
@@ -106,6 +111,8 @@ func (p *pouch) resolveSecret(c SecretConfig) error {
 		if err != nil {
 			return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
 		}
+
+		p.addForNotify(fc.Notify...)
 	}
 	return nil
 }
@@ -137,6 +144,8 @@ func (p *pouch) Run(ctx context.Context) error {
 	p.NotifyReady()
 
 	for {
+		p.notifyPending()
+
 		err = p.State.Save()
 		if err != nil {
 			log.Printf("Couldn't save state: %s", err)
@@ -163,8 +172,8 @@ func (p *pouch) Run(ctx context.Context) error {
 	}
 }
 
-func NewPouch(s *PouchState, vc vault.Vault, sc []SecretConfig) Pouch {
-	return &pouch{State: s, Vault: vc, Secrets: sc}
+func NewPouch(s *PouchState, vc vault.Vault, sc []SecretConfig, nc map[string]NotifierConfig) Pouch {
+	return &pouch{State: s, Vault: vc, Secrets: sc, Notifiers: nc}
 }
 
 func (p *pouch) AddStatusNotifier(n StatusNotifier) {
@@ -180,15 +189,44 @@ func (p *pouch) NotifyReady() {
 	}
 }
 
-func (p *pouch) AddReloader(n Reloader) {
-	p.reloaders = append(p.reloaders, n)
+func (p *pouch) addForNotify(names ...string) {
+	if p.pendingNotifiers == nil {
+		p.pendingNotifiers = make(map[string]bool)
+	}
+	for _, name := range names {
+		p.pendingNotifiers[name] = true
+	}
 }
 
-func (p *pouch) Reload(name string) {
-	for _, n := range p.reloaders {
-		err := n.Reload(name)
-		if err != nil {
-			log.Println(err)
+func (p *pouch) notifyPending() {
+	for pending := range p.pendingNotifiers {
+		p.Notify(pending)
+		delete(p.pendingNotifiers, pending)
+	}
+}
+
+func (p *pouch) Notify(name string) {
+	notifier, found := p.Notifiers[name]
+	if !found {
+		log.Printf("Couldn't find notifier for '%s'", name)
+	}
+	timeout := DefaultNotifyTimeout
+	if notifier.Timeout != "" {
+		t, err := time.ParseDuration(notifier.Timeout)
+		if err == nil {
+			timeout = t
+		} else {
+			log.Printf("Incorrect timeout: %s", err)
+		}
+	}
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	cmd := exec.CommandContext(ctx, "sh", "-c", notifier.Command)
+	cmd.Stdin = nil
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Notification to '%s' failed: %s", name, err)
+		if len(out) > 0 {
+			log.Println(string(out))
 		}
 	}
 }

@@ -70,7 +70,7 @@ func TestPouchRun(t *testing.T) {
 
 	state, cleanup := newTestState()
 	defer cleanup()
-	pouch := NewPouch(state, v, secrets)
+	pouch := NewPouch(state, v, secrets, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	finished := make(chan error)
@@ -136,7 +136,7 @@ func TestPouchWatch(t *testing.T) {
 
 	state, cleanup := newTestState()
 	defer cleanup()
-	pouch := NewPouch(state, v, secrets)
+	pouch := NewPouch(state, v, secrets, nil)
 
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
