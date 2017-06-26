@@ -17,15 +17,24 @@ limitations under the License.
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 )
 
 const (
+	// Token renewal period is its TTL multiplied by this ratio
+	AutoRenewPeriodRatio = 0.5
+
 	TokenHeader   = "X-Vault-Token"
 	WrapTTLHeader = "X-Vault-Wrap-Ttl"
+
+	SelfTokenURL      = "/v1//auth/token/lookup-self"
+	SelfTokenRenewURL = "/v1/auth/token/renew-self"
 
 	SysHealthURL = "/v1/sys/health"
 
@@ -78,8 +87,64 @@ func (v *vaultApi) getClient() (*api.Client, error) {
 	return api.NewClient(config)
 }
 
+func (v *vaultApi) tokenTTL() (int64, error) {
+	resp, err := v.Request(http.MethodGet, SelfTokenURL, nil)
+	if err != nil || resp == nil {
+		return 0, fmt.Errorf("couldn't obtain self token information: %v", err)
+	}
+	ttlNumber, ok := resp.Data["ttl"].(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("couldn't obtain token TTL")
+	}
+	return ttlNumber.Int64()
+}
+
+func (v *vaultApi) autoRenewToken() {
+	var ttl int64
+	var err error
+
+	retry := func(attempts int, t time.Duration, f func() error) {
+		for attempt := 0; attempt < attempts; attempt++ {
+			err = f()
+			if err == nil {
+				<-time.After(t)
+				break
+			}
+		}
+	}
+
+	for {
+		retry(5, 1*time.Second, func() error {
+			ttl, err = v.tokenTTL()
+			return err
+		})
+		if err != nil {
+			log.Printf("Couldn't obtain token TTL: %s\n", err)
+			break
+		}
+		if ttl == 0 {
+			log.Println("Using token without expiration")
+			return
+		}
+		period := time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
+		log.Printf("Next token renewal in %s", period)
+		<-time.After(period)
+		retry(5, 1*time.Second, func() error {
+			_, err = v.Request(http.MethodPost, SelfTokenRenewURL, nil)
+			return err
+		})
+		if err != nil {
+			log.Printf("Failed to renew token: %s", err)
+			break
+		}
+		log.Println("Token succesfuly renewed")
+	}
+	log.Println("Won't autorenew token")
+}
+
 func (v *vaultApi) Login() error {
 	if v.Token != "" {
+		go v.autoRenewToken()
 		return nil
 	}
 	if v.RoleID == "" {
@@ -97,6 +162,7 @@ func (v *vaultApi) Login() error {
 	}
 
 	v.Token = resp.Auth.ClientToken
+	go v.autoRenewToken()
 
 	return nil
 }

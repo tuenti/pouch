@@ -35,12 +35,9 @@ wrapped temporal secret ID.
 ```
 systemd:
   enabled: <enable systemd integration>
-  auto_restart: <enable systemd-based autorestart>
 ```
 Configuration of integration with systemd. By default `pouch` uses systemd
-integration if it can detect it. If it uses it it can automatically restart
-or reload dependant services, `auto_restart` can be used to disable this
-behaviour.
+integration if it can detect it.
 
 ```
 secrets:
@@ -86,14 +83,10 @@ secrets:
 
 ## Integration with systemd
 
-`pouch` is better suited to work with systemd. It has the following
-integration points:
-* It supports `notify` service type. If it's started from a service unit
-  with `Type=notify`, it will notify its readiness only after all secrets
-  have been retrieved and files populated. This can be used to control when
-  other units can be started, a unit with `Requires=pouch.service` won't be
-  started till configuration files are ready.
-* It "extends" `PropagatesReloadTo=`/`PropagatesReloadFrom` so it also
-  reloads or restarts services when secrets change. This can be used to renew
-  secrets. A unit in the propagates reload list will be restarted if it
-  doesn't have an `ExecReload=` defined.
+`pouch` is better suited to work with systemd.
+
+It supports `notify` service type. If it's started from a service unit
+with `Type=notify`, it will notify its readiness only after all secrets
+have been retrieved and files populated. This can be used to control when
+other units can be started, a unit with `Requires=pouch.service` won't be
+started till configuration files are ready.

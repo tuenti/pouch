@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -48,24 +49,34 @@ func main() {
 		log.Fatalf("Couldn't load Pouchfile: %v", err)
 	}
 
+	state, err := pouch.LoadState(pouchfile.StatePath)
+	if err == nil {
+		log.Printf("Using state stored in %s", pouchfile.StatePath)
+		pouchfile.Vault.Token = state.Token
+	} else {
+		log.Printf("Couldn't load state: %s, starting from scratch", err)
+		state = pouch.NewState(pouchfile.StatePath)
+	}
+
 	vault := vault.New(pouchfile.Vault)
 
-	p := pouch.NewPouch(vault, pouchfile.Secrets)
+	p := pouch.NewPouch(state, vault, pouchfile.Secrets, pouchfile.Notifiers)
 
 	systemd := systemd.New(pouchfile.Systemd.Configurer())
-	if systemd.IsAvailable() {
-		p.AddAutoReloader(systemd)
-		if systemd.CanNotify() {
-			p.AddStatusNotifier(systemd)
-		}
+	if systemd.IsAvailable() && systemd.CanNotify() {
+		p.AddStatusNotifier(systemd)
 	}
 	defer systemd.Close()
 
-	if pouchfile.WrappedSecretIDPath != "" {
-		err = p.Watch(pouchfile.WrappedSecretIDPath)
-	} else {
-		err = p.Run()
+	if path := pouchfile.WrappedSecretIDPath; state.Token == "" && path != "" {
+		log.Printf("Waiting for a wrapped secret ID in %s", path)
+		err = p.Watch(path)
+		if err != nil {
+			log.Fatalf("Couldn't obtain secret ID from %s: %v", path, err)
+		}
 	}
+
+	err = p.Run(context.Background())
 	if err != nil {
 		log.Fatalf("Pouch failed: %v", err)
 	}
