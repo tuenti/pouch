@@ -53,7 +53,7 @@ type pouch struct {
 	State *PouchState
 
 	Vault     vault.Vault
-	Secrets   []SecretConfig
+	Secrets   map[string]SecretConfig
 	Notifiers map[string]NotifierConfig
 
 	statusNotifiers  []StatusNotifier
@@ -88,13 +88,13 @@ func getFileContent(fc FileConfig, data interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func (p *pouch) resolveSecret(c SecretConfig) error {
+func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 	options := &vault.RequestOptions{Data: c.Data}
 	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
 	if err != nil {
 		return err
 	}
-	p.State.SetSecret(c.Name, s)
+	p.State.SetSecret(name, s)
 	for _, fc := range c.Files {
 		dir := path.Dir(fc.Path)
 		err := os.MkdirAll(dir, 0700)
@@ -124,11 +124,9 @@ func (p *pouch) Run(ctx context.Context) error {
 	}
 	p.State.Token = p.Vault.GetToken()
 
-	secretConfigs := make(map[string]SecretConfig)
-	for _, c := range p.Secrets {
-		secretConfigs[c.Name] = c
-		if _, found := p.State.Secrets[c.Name]; !found {
-			err = p.resolveSecret(c)
+	for name, c := range p.Secrets {
+		if _, found := p.State.Secrets[name]; !found {
+			err = p.resolveSecret(name, c)
 			if err != nil {
 				return err
 			}
@@ -136,7 +134,7 @@ func (p *pouch) Run(ctx context.Context) error {
 	}
 
 	for name := range p.State.Secrets {
-		if _, found := secretConfigs[name]; !found {
+		if _, found := p.Secrets[name]; !found {
 			p.State.DeleteSecret(name)
 		}
 	}
@@ -162,7 +160,7 @@ func (p *pouch) Run(ctx context.Context) error {
 		select {
 		case <-nextUpdate:
 			log.Printf("Updating secret '%s'", s.Name)
-			err = p.resolveSecret(secretConfigs[s.Name])
+			err = p.resolveSecret(s.Name, p.Secrets[s.Name])
 			if err != nil {
 				return err
 			}
@@ -172,7 +170,7 @@ func (p *pouch) Run(ctx context.Context) error {
 	}
 }
 
-func NewPouch(s *PouchState, vc vault.Vault, sc []SecretConfig, nc map[string]NotifierConfig) Pouch {
+func NewPouch(s *PouchState, vc vault.Vault, sc map[string]SecretConfig, nc map[string]NotifierConfig) Pouch {
 	return &pouch{State: s, Vault: vc, Secrets: sc, Notifiers: nc}
 }
 

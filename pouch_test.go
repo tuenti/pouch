@@ -57,8 +57,8 @@ func TestPouchRun(t *testing.T) {
 		t.Fatalf("couldn't create temporal directory")
 	}
 	defer os.RemoveAll(tmpdir)
-	secrets := []SecretConfig{
-		{
+	secrets := map[string]SecretConfig{
+		"foo": {
 			VaultURL:   "/v1/foo",
 			HTTPMethod: "GET",
 			Files: []FileConfig{
@@ -124,8 +124,8 @@ func TestPouchWatch(t *testing.T) {
 			},
 		},
 	}
-	secrets := []SecretConfig{
-		{
+	secrets := map[string]SecretConfig{
+		"foo": {
 			VaultURL:   "/v1/foo",
 			HTTPMethod: "GET",
 			Files: []FileConfig{

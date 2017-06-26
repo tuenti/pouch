@@ -33,7 +33,7 @@ type Pouchfile struct {
 	Vault     vault.Config              `json:"vault,omitempty"`
 	Systemd   SystemdConfig             `json:"systemd,omitempty"`
 	Notifiers map[string]NotifierConfig `json:"notifiers,omitempty"`
-	Secrets   []SecretConfig            `json:"secrets,omitempty"`
+	Secrets   map[string]SecretConfig   `json:"secrets,omitempty"`
 }
 
 type SystemdConfig struct {
@@ -57,7 +57,6 @@ func (s *SystemdConfig) Configurer() *systemdConfigurer {
 }
 
 type SecretConfig struct {
-	Name       string                 `json:"name,omitempty"`
 	VaultURL   string                 `json:"vault_url,omitempty"`
 	HTTPMethod string                 `json:"http_method,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`
