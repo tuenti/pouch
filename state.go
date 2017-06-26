@@ -123,6 +123,10 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 	s.Secrets[name] = state
 }
 
+func (s *PouchState) DeleteSecret(name string) {
+	delete(s.Secrets, name)
+}
+
 func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	for name := range s.Secrets {
 		ttu := s.Secrets[name].TimeToUpdate()
@@ -130,6 +134,9 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 			secret = s.Secrets[name]
 			minTTU = ttu
 		}
+	}
+	if minTTU < 0 {
+		minTTU = 0
 	}
 	return
 }
@@ -147,9 +154,6 @@ type SecretState struct {
 	// TTL, in seconds, if any when the secret was read
 	TTL int `json:"ttl,omitempty"`
 
-	// Refresh interval
-	RefreshInterval int "json:`refresh_interval,omitempty`"
-
 	// Secret will be renewed after this portion of its life has passed
 	DurationRatio float64 `json:"duration_ratio,omitempty"`
 }
@@ -161,14 +165,11 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 	}
 
 	// Next update for the secret will be based on these rules:
-	// - If a refresh interval has been provided, we use it
 	// - If we have both a TTL and a lease duration, we use the minimal of them
 	// - If we have only a TTL or a lease duration, we take it
 	// - If we don't have anything, we won't try to update this secret
 	var duration int
 	switch {
-	case s.RefreshInterval > 0:
-		duration = s.RefreshInterval
 	case s.TTL > 0 && s.LeaseDuration > 0:
 		if s.TTL < s.LeaseDuration {
 			duration = s.TTL

@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -78,7 +79,7 @@ func main() {
 		}
 	}
 
-	err = p.Run()
+	err = p.Run(context.Background())
 	if err != nil {
 		log.Fatalf("Pouch failed: %v", err)
 	}

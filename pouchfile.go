@@ -66,6 +66,7 @@ func (s *SystemdConfig) Configurer() *systemdConfigurer {
 }
 
 type SecretConfig struct {
+	Name       string                 `json:"name,omitempty"`
 	VaultURL   string                 `json:"vault_url,omitempty"`
 	HTTPMethod string                 `json:"http_method,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`

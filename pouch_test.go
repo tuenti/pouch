@@ -17,11 +17,11 @@ limitations under the License.
 package pouch
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/tuenti/pouch/pkg/vault"
 
@@ -29,6 +29,12 @@ import (
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 )
+
+func newTestState() (state *PouchState, cleanup func()) {
+	f, _ := ioutil.TempFile("", "pouch-state-test")
+	f.Close()
+	return NewState(f.Name()), func() { os.Remove(f.Name()) }
+}
 
 func TestPouchRun(t *testing.T) {
 	v := &vault.DummyVault{
@@ -62,9 +68,17 @@ func TestPouchRun(t *testing.T) {
 		},
 	}
 
-	pouch := NewPouch(v, secrets)
+	state, cleanup := newTestState()
+	defer cleanup()
+	pouch := NewPouch(state, v, secrets)
 
-	err = pouch.Run()
+	ctx, cancel := context.WithCancel(context.Background())
+	finished := make(chan error)
+	go func() {
+		finished <- pouch.Run(ctx)
+	}()
+	cancel()
+	err = <-finished
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +134,9 @@ func TestPouchWatch(t *testing.T) {
 		},
 	}
 
-	pouch := NewPouch(v, secrets)
+	state, cleanup := newTestState()
+	defer cleanup()
+	pouch := NewPouch(state, v, secrets)
 
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -131,29 +147,18 @@ func TestPouchWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	finished := make(chan error)
 	go func() {
-		err := pouch.Watch(secretWrapPath.Name())
-		if err != nil {
-			t.Fatal(err)
-		}
+		finished <- pouch.Watch(secretWrapPath.Name())
 	}()
 
 	secretWrapPath.Write([]byte("wrap"))
 	secretWrapPath.Close()
 
-	written := false
-	for !written {
-		select {
-		case e := <-w.Events:
-			written = (e.Op == fsnotify.Write) && (e.Name == path.Join(tmpdir, "foo"))
-		case <-time.After(time.Second):
-			t.Fatal("timeout")
-		}
-	}
-
-	d, err := ioutil.ReadFile(path.Join(tmpdir, "foo"))
+	err = <-finished
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, string(d), "secretfoo", "File content should be the secret")
+
+	assert.Equal(t, v.SecretID, v.ExpectedSecretID)
 }

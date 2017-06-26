@@ -18,20 +18,20 @@ package pouch
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"os/signal"
 	"path"
-	"syscall"
 	"text/template"
+	"time"
 
 	"github.com/tuenti/pouch/pkg/vault"
 )
 
 type Pouch interface {
-	Run() error
+	Run(context.Context) error
 	Watch(path string) error
 	AddStatusNotifier(StatusNotifier)
 	AddAutoReloader(AutoReloader)
@@ -84,53 +84,85 @@ func getFileContent(fc FileConfig, data interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func (p *pouch) Run() error {
+func (p *pouch) resolveSecret(c SecretConfig) error {
+	options := &vault.RequestOptions{Data: c.Data}
+	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+	if err != nil {
+		return err
+	}
+	p.State.SetSecret(c.Name, s)
+	for _, fc := range c.Files {
+		dir := path.Dir(fc.Path)
+		err := os.MkdirAll(dir, 0700)
+		if err != nil {
+			return err
+		}
+
+		content, err := getFileContent(fc, s.Data)
+		if err != nil {
+			return err
+		}
+
+		err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
+		if err != nil {
+			return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
+		}
+	}
+	return nil
+}
+
+func (p *pouch) Run(ctx context.Context) error {
 	err := p.Vault.Login()
 	if err != nil {
 		return err
 	}
 	p.State.Token = p.Vault.GetToken()
 
-	sigHup := make(chan os.Signal, 1)
-	signal.Notify(sigHup, syscall.SIGHUP)
-
-	for {
-		for _, c := range p.Secrets {
-			options := &vault.RequestOptions{Data: c.Data}
-			s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+	secretConfigs := make(map[string]SecretConfig)
+	for _, c := range p.Secrets {
+		secretConfigs[c.Name] = c
+		if _, found := p.State.Secrets[c.Name]; !found {
+			err = p.resolveSecret(c)
 			if err != nil {
 				return err
 			}
-			for _, fc := range c.Files {
-				dir := path.Dir(fc.Path)
-				err := os.MkdirAll(dir, 0700)
-				if err != nil {
-					return err
-				}
-
-				content, err := getFileContent(fc, s.Data)
-				if err != nil {
-					return err
-				}
-
-				err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
-				if err != nil {
-					return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
-				}
-			}
 		}
-		p.AutoRestart()
-		p.NotifyReady()
+	}
 
+	for name := range p.State.Secrets {
+		if _, found := secretConfigs[name]; !found {
+			p.State.DeleteSecret(name)
+		}
+	}
+
+	for {
 		err = p.State.Save()
 		if err != nil {
 			log.Printf("Couldn't save state: %s", err)
 		}
 
-		select {
-		case <-sigHup:
-			p.NotifyReload()
+		p.AutoRestart()
+		p.NotifyReady()
+
+		var nextUpdate <-chan time.Time
+		s, ttu := p.State.NextUpdate()
+		if s != nil {
+			nextUpdate = time.After(ttu)
+		} else {
+			log.Printf("No secret to update")
 		}
+
+		select {
+		case <-nextUpdate:
+			log.Printf("Updating secret '%s'", s.Name)
+			err = p.resolveSecret(secretConfigs[s.Name])
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+		p.NotifyReload()
 	}
 }
 
