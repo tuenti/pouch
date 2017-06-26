@@ -41,15 +41,16 @@ integration if it can detect it.
 
 ```
 secrets:
-- vault_url: <Vault HTTP API url>
-  http_method: <HTTP method to use to request secrets>
-  files:
-  - path: <path to file to create>
-    template: <inline template for the file>
-    templateFile: <path to file containing a template>
+  name:
+    vault_url: <Vault HTTP API url>
+    http_method: <HTTP method to use to request secrets>
+    files:
+    - path: <path to file to create>
+      template: <inline template for the file>
+      templateFile: <path to file containing a template>
   <...>
 ```
-List of secrets to be retrieved from Vault using its [HTTP API](https://www.vaultproject.io/api/index.html).
+Map of secrets to be retrieved from Vault using its [HTTP API](https://www.vaultproject.io/api/index.html).
 Secrets are retrieved using the configured AppRole, so obviously this AppRole
 needs to have permissions to do these requests. Requests are done using HTTP,
 to the `vault_url` using the specified `http_method`.
@@ -66,18 +67,19 @@ vault:
 systemd:
   auto_restart: false
 secrets:
-- vault_url: /v1/kubernetes-pki/issue/kubelet
-  http_method: POST
-  files:
-  - path: /etc/kubernetes/ssl/client.key
-    template: |
-      {{ .private_key }}
-  - path: /etc/kubernetes/ssl/client.crt
-    template: |
-      {{ .certificate }}
-  - path: /etc/kubernetes/ssl/ca.crt
-    template: |
-      {{ .issuing_ca }}
+  kubelet_certs:
+  - vault_url: /v1/kubernetes-pki/issue/kubelet
+    http_method: POST
+    files:
+    - path: /etc/kubernetes/ssl/client.key
+      template: |
+        {{ .private_key }}
+    - path: /etc/kubernetes/ssl/client.crt
+      template: |
+        {{ .certificate }}
+    - path: /etc/kubernetes/ssl/ca.crt
+      template: |
+        {{ .issuing_ca }}
 
 ```
 
