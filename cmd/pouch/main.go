@@ -64,7 +64,7 @@ func main() {
 
 	systemd := systemd.New(pouchfile.Systemd.Configurer())
 	if systemd.IsAvailable() {
-		p.AddAutoReloader(systemd)
+		p.AddReloader(systemd)
 		if systemd.CanNotify() {
 			p.AddStatusNotifier(systemd)
 		}

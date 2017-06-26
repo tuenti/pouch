@@ -33,26 +33,22 @@ type SystemD interface {
 	UnitName() (string, error)
 	Close()
 
-	AutoReload() error
-	NotifyReload() error
+	Reload(name string) error
 	NotifyReady() error
 }
 
 type SystemdConfigurer interface {
 	Enabled() bool
-	AutoRestart() bool
 }
 
 func New(c SystemdConfigurer) SystemD {
 	return &systemd{
-		enabled:     c.Enabled(),
-		autoRestart: c.AutoRestart(),
+		enabled: c.Enabled(),
 	}
 }
 
 type systemd struct {
-	enabled     bool
-	autoRestart bool
+	enabled bool
 
 	name string
 }
@@ -127,56 +123,20 @@ func (s *systemd) NotifyReady() error {
 	return nil
 }
 
-func (s *systemd) NotifyReload() error {
-	sent, err := daemon.SdNotify(false, "RELOADING=1")
-	if err != nil {
-		return fmt.Errorf("couldn't notify reload: %v", err)
-	}
-	if !sent {
-		return fmt.Errorf("reload notification to dbus was not sent")
-	}
-	return nil
-}
-
-func (s *systemd) AutoReload() error {
-	if !s.autoRestart {
-		return nil
-	}
-
+func (s *systemd) Reload(name string) error {
 	c, err := dbus.New()
 	if err != nil {
 		return err
 	}
+	defer c.Close()
 
-	name, _ := s.getName()
-	propagateToProp, err := c.GetUnitProperty(name, "PropagatesReloadTo")
+	result := make(chan string, 1)
+	_, err = c.ReloadOrRestartUnit(name, "replace", result)
 	if err != nil {
 		return err
 	}
-
-	units, ok := propagateToProp.Value.Value().([]string)
-	if !ok {
-		return fmt.Errorf("couldn't convert property to units list (value: %+v)", propagateToProp.Value.Value())
-	}
-
-	errors := false
-	results := make([]chan string, len(units))
-	for i, unit := range units {
-		results[i] = make(chan string, 1)
-		_, err := c.ReloadOrRestartUnit(unit, "replace", results[i])
-		if err != nil {
-			log.Printf("error reloading %s: %v\n", unit, err)
-			errors = true
-		}
-	}
-	for i, result := range results {
-		if r := <-result; r != "done" {
-			log.Printf("reload job for %s is not done (found: %s)", units[i], r)
-			errors = true
-		}
-	}
-	if errors {
-		return fmt.Errorf("there were errors when restarting units")
+	if r := <-result; r != "done" {
+		return fmt.Errorf("reload job for %s is not done (found: %s)", name, r)
 	}
 	return nil
 }

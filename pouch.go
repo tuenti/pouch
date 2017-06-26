@@ -34,16 +34,15 @@ type Pouch interface {
 	Run(context.Context) error
 	Watch(path string) error
 	AddStatusNotifier(StatusNotifier)
-	AddAutoReloader(AutoReloader)
+	AddReloader(Reloader)
 }
 
 type StatusNotifier interface {
 	NotifyReady() error
-	NotifyReload() error
 }
 
-type AutoReloader interface {
-	AutoReload() error
+type Reloader interface {
+	Reload(string) error
 }
 
 type pouch struct {
@@ -53,7 +52,7 @@ type pouch struct {
 	Secrets []SecretConfig
 
 	statusNotifiers []StatusNotifier
-	autoReloaders   []AutoReloader
+	reloaders       []Reloader
 }
 
 func getFileContent(fc FileConfig, data interface{}) (string, error) {
@@ -135,14 +134,13 @@ func (p *pouch) Run(ctx context.Context) error {
 		}
 	}
 
+	p.NotifyReady()
+
 	for {
 		err = p.State.Save()
 		if err != nil {
 			log.Printf("Couldn't save state: %s", err)
 		}
-
-		p.AutoRestart()
-		p.NotifyReady()
 
 		var nextUpdate <-chan time.Time
 		s, ttu := p.State.NextUpdate()
@@ -162,7 +160,6 @@ func (p *pouch) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		}
-		p.NotifyReload()
 	}
 }
 
@@ -183,25 +180,15 @@ func (p *pouch) NotifyReady() {
 	}
 }
 
-func (p *pouch) NotifyReload() {
-	for _, n := range p.statusNotifiers {
-		err := n.NotifyReload()
+func (p *pouch) AddReloader(n Reloader) {
+	p.reloaders = append(p.reloaders, n)
+}
+
+func (p *pouch) Reload(name string) {
+	for _, n := range p.reloaders {
+		err := n.Reload(name)
 		if err != nil {
 			log.Println(err)
 		}
 	}
-}
-
-func (p *pouch) AddAutoReloader(n AutoReloader) {
-	p.autoReloaders = append(p.autoReloaders, n)
-}
-
-func (p *pouch) AutoRestart() {
-	for _, n := range p.autoReloaders {
-		err := n.AutoReload()
-		if err != nil {
-			log.Println(err)
-		}
-	}
-
 }

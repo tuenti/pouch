@@ -39,29 +39,19 @@ type SystemdConfig struct {
 	// If pouch should enable systemd support. Defaults to true
 	// if systemd is available
 	Enabled *bool `json:"enabled,omitempty"`
-
-	// AutoRestarts services requiring pouch when new keys are
-	// obtained, disabled by default
-	AutoRestart *bool `json:"auto_restart,omitempty"`
 }
 
 type systemdConfigurer struct {
-	enabled     bool
-	autoRestart bool
+	enabled bool
 }
 
 func (c *systemdConfigurer) Enabled() bool {
 	return c.enabled
 }
 
-func (c *systemdConfigurer) AutoRestart() bool {
-	return c.autoRestart
-}
-
 func (s *SystemdConfig) Configurer() *systemdConfigurer {
 	return &systemdConfigurer{
-		enabled:     s.Enabled == nil || *s.Enabled,
-		autoRestart: s.AutoRestart != nil && *s.AutoRestart,
+		enabled: s.Enabled == nil || *s.Enabled,
 	}
 }
 
