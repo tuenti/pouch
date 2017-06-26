@@ -65,7 +65,7 @@ vault:
   address: https://127.0.0.1:8200
   role_id: kubelet
 systemd:
-  auto_restart: false
+  enabled: false
 secrets:
   kubelet_certs:
   - vault_url: /v1/kubernetes-pki/issue/kubelet
