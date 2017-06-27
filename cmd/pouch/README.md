@@ -49,6 +49,9 @@ secrets:
       mode: <mode for the file and subdirectories if they are created>
       template: <inline template for the file>
       templateFile: <path to file containing a template>
+      notify:
+      - <notifier>
+      <...>
   <...>
 ```
 Map of secrets to be retrieved from Vault using its [HTTP API](https://www.vaultproject.io/api/index.html).
@@ -57,6 +60,17 @@ needs to have permissions to do these requests. Requests are done using HTTP,
 to the `vault_url` using the specified `http_method`.
 Once retrieved a list of `files` are provisioned using the JSON response from
 Vault.
+
+```
+notifiers:
+  name:
+    command: <command>
+    timeout: <command timeout>
+```
+Map of notifiers that can be used to notify changes on files. It is intended
+to reload services or any other required trigger. It is specified as a
+`command` that is run inside a shell, and `timeout` as a maximum execution
+time.
 
 As an example:
 
