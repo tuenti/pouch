@@ -46,6 +46,7 @@ secrets:
     http_method: <HTTP method to use to request secrets>
     files:
     - path: <path to file to create>
+      mode: <mode for the file and subdirectories if they are created>
       template: <inline template for the file>
       templateFile: <path to file containing a template>
   <...>
@@ -72,12 +73,15 @@ secrets:
     http_method: POST
     files:
     - path: /etc/kubernetes/ssl/client.key
+      mode: 0600
       template: |
         {{ .private_key }}
     - path: /etc/kubernetes/ssl/client.crt
+      mode: 0600
       template: |
         {{ .certificate }}
     - path: /etc/kubernetes/ssl/ca.crt
+      mode: 0600
       template: |
         {{ .issuing_ca }}
 

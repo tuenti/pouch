@@ -162,3 +162,26 @@ func TestPouchWatch(t *testing.T) {
 
 	assert.Equal(t, v.SecretID, v.ExpectedSecretID)
 }
+
+var dirModeCases = []struct {
+	mode    os.FileMode
+	dirMode os.FileMode
+}{
+	{os.FileMode(0000), os.FileMode(0000)},
+	{os.FileMode(0004), os.FileMode(0005)},
+	{os.FileMode(0640), os.FileMode(0750)},
+	{os.FileMode(0400), os.FileMode(0500)},
+	{os.FileMode(0666), os.FileMode(0777)},
+	{os.FileMode(0444), os.FileMode(0555)},
+	{os.FileMode(0777), os.FileMode(0777)},
+	{os.FileMode(0640) | os.ModeSetuid, os.FileMode(0750)},
+	{os.FileMode(0640) | os.ModeSticky, os.FileMode(0750)},
+	{DefaultFileMode, os.FileMode(0700)},
+}
+
+func TestDirPerms(t *testing.T) {
+	for _, c := range dirModeCases {
+		d := dirMode(c.mode)
+		assert.Equal(t, c.dirMode.String(), d.String())
+	}
+}

@@ -33,6 +33,7 @@ import (
 
 const (
 	DefaultNotifyTimeout = 5 * time.Minute
+	DefaultFileMode      = os.FileMode(0600)
 )
 
 type Pouch interface {
@@ -88,6 +89,17 @@ func getFileContent(fc FileConfig, data interface{}) (string, error) {
 	return b.String(), nil
 }
 
+func dirMode(mode os.FileMode) os.FileMode {
+	result := os.FileMode(0)
+	for i := 01; i <= 0777; i *= 010 {
+		mask := os.FileMode(7 * i)
+		if mode&mask > 0 {
+			result |= (mode & mask) | os.FileMode(i)
+		}
+	}
+	return result
+}
+
 func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 	options := &vault.RequestOptions{Data: c.Data}
 	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
@@ -96,8 +108,12 @@ func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 	}
 	p.State.SetSecret(name, s)
 	for _, fc := range c.Files {
+		mode := os.FileMode(fc.Mode)
+		if mode == 0 {
+			mode = DefaultFileMode
+		}
 		dir := path.Dir(fc.Path)
-		err := os.MkdirAll(dir, 0700)
+		err := os.MkdirAll(dir, dirMode(mode))
 		if err != nil {
 			return err
 		}
@@ -107,9 +123,9 @@ func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 			return err
 		}
 
-		err = ioutil.WriteFile(fc.Path, []byte(content), 0600)
+		err = ioutil.WriteFile(fc.Path, []byte(content), mode)
 		if err != nil {
-			return fmt.Errorf("couldn't write secret in '%s': %s", p, err)
+			return fmt.Errorf("couldn't write secret in '%s': %s", fc.Path, err)
 		}
 
 		p.addForNotify(fc.Notify...)

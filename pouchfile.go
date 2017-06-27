@@ -65,6 +65,7 @@ type SecretConfig struct {
 
 type FileConfig struct {
 	Path         string   `json:"path,omitempty"`
+	Mode         int      `json:"mode,omitempty"`
 	Template     string   `json:"template,omitempty"`
 	TemplateFile string   `json:"template_file,omitempty"`
 	Notify       []string `json:"notify,omitempty"`
