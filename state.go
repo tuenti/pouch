@@ -17,7 +17,10 @@ limitations under the License.
 package pouch
 
 import (
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -102,6 +105,35 @@ func (s *PouchState) Save() error {
 	return ioutil.WriteFile(path, d, DefaultStateMode)
 }
 
+// Alternative sources of TTLs if no other TTL or lease
+// duration has been found before
+var secretTTLSources = []func(*api.Secret) (int, error){
+	ttlFromCertificateValidity,
+}
+
+func ttlFromCertificateValidity(s *api.Secret) (int, error) {
+	if s.Data == nil {
+		return 0, nil
+	}
+
+	data, ok := s.Data["certificate"].(string)
+	if !ok {
+		return 0, nil
+	}
+
+	block, _ := pem.Decode([]byte(data))
+	if block == nil {
+		return 0, fmt.Errorf("failed to parse certificate PEM")
+	}
+
+	certificate, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(certificate.NotAfter.Sub(time.Now()).Seconds()), nil
+}
+
 func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 	if s.Secrets == nil {
 		s.Secrets = make(map[string]*SecretState)
@@ -120,6 +152,21 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 			}
 		}
 	}
+
+	if state.TimeToUpdate() == 0 {
+		// Without a known TTU, we don't know when to update
+		state.DisableAutoUpdate = true
+
+		// Look for some expiration time in the secret itself
+		for _, source := range secretTTLSources {
+			ttl, err := source(secret)
+			if err == nil && ttl > 0 {
+				state.TTL = ttl
+				state.DisableAutoUpdate = false
+				break
+			}
+		}
+	}
 	s.Secrets[name] = state
 }
 
@@ -129,6 +176,9 @@ func (s *PouchState) DeleteSecret(name string) {
 
 func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	for name := range s.Secrets {
+		if s.Secrets[name].DisableAutoUpdate {
+			continue
+		}
 		ttu := s.Secrets[name].TimeToUpdate()
 		if secret == nil || ttu < minTTU {
 			secret = s.Secrets[name]
@@ -149,13 +199,16 @@ type SecretState struct {
 	Timestamp time.Time `json:"creation_time,omitempty"`
 
 	// Lease duration, in seconds, if any when the secret was read
-	LeaseDuration int `json:"lease_id,omitempty"`
+	LeaseDuration int `json:"lease_duration,omitempty"`
 
 	// TTL, in seconds, if any when the secret was read
 	TTL int `json:"ttl,omitempty"`
 
 	// Secret will be renewed after this portion of its life has passed
 	DurationRatio float64 `json:"duration_ratio,omitempty"`
+
+	// If the secret has no expiration data, don't try to update it
+	DisableAutoUpdate bool `json:"disable_auto_uptdate,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
@@ -180,6 +233,9 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 		duration = s.TTL
 	case s.LeaseDuration > 0:
 		duration = s.LeaseDuration
+	default:
+		// Unknown TTU
+		return 0
 	}
 
 	return (time.Duration(float64(duration)*ratio) * time.Second) - time.Now().Sub(s.Timestamp)
