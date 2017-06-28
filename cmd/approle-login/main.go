@@ -31,13 +31,14 @@ var version = "dev"
 func main() {
 	var address, roleId, secretId, wrappedSecretIdPath string
 	var output string
-	var showVersion bool
+	var raw, showVersion bool
 
 	flag.StringVar(&address, "address", "", "Address of vault server, VAULT_ADDR can be used instead")
 	flag.StringVar(&roleId, "role-id", "", "Role ID to use for login")
 	flag.StringVar(&secretId, "secret-id", "", "Secret ID to use for login")
 	flag.StringVar(&output, "output", "", "Path to write the token")
 	flag.StringVar(&wrappedSecretIdPath, "wrapped-secret-id-path", "", "Path to file containing a wrapped secret ID")
+	flag.BoolVar(&raw, "raw", false, "Outputs just the token instead of an environment file")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 	flag.Parse()
 
@@ -85,5 +86,10 @@ func main() {
 		}
 		defer f.Close()
 	}
-	fmt.Fprintf(f, "VAULT_TOKEN=%s\n", token)
+
+	if raw {
+		fmt.Fprint(f, token)
+	} else {
+		fmt.Fprintf(f, "VAULT_TOKEN=%s\n", token)
+	}
 }
