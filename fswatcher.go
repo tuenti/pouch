@@ -19,6 +19,7 @@ package pouch
 import (
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -44,8 +45,11 @@ func (p *pouch) handleWrapped(path string) error {
 
 func (p *pouch) Watch(path string) error {
 	// If the file is here, we are done, try before watching
-	if err := p.handleWrapped(path); err == nil {
-		return nil
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		err = p.handleWrapped(path)
+		if err != isEmpty {
+			return err
+		}
 	}
 
 	watcher, err := fsnotify.NewWatcher()
