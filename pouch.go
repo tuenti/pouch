@@ -139,6 +139,10 @@ func (p *pouch) Run(ctx context.Context) error {
 		return err
 	}
 	p.State.Token = p.Vault.GetToken()
+	err = p.State.Save()
+	if err != nil {
+		log.Printf("Couldn't save state: %s", err)
+	}
 
 	for name, c := range p.Secrets {
 		if _, found := p.State.Secrets[name]; !found {
