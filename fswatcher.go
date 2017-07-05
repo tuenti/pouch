@@ -18,6 +18,7 @@ package pouch
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -61,7 +62,7 @@ func (p *pouch) Watch(path string) error {
 	dir := filepath.Dir(path)
 	err = watcher.Add(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("when adding watcher for %s: %v", dir, err)
 	}
 
 	for {
