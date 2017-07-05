@@ -106,3 +106,42 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 		t.Fatalf("couldn't login: %v", err)
 	}
 }
+
+func TestRequestWithData(t *testing.T) {
+	core, _, token := NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
+
+	admin := vaultApi{
+		Address: address,
+		Token:   token,
+	}
+
+	secretURL := "/v1/secret/foo"
+	secretName := "foo"
+	secret := "this is a secret!"
+	_, err := admin.Request("POST", secretURL, &RequestOptions{
+		Data: map[string]interface{}{
+			secretName: secret,
+		},
+	})
+	if err != nil {
+		t.Fatalf("couldn't create secret with data: %v", err)
+	}
+
+	s, err := admin.Request("GET", secretURL, nil)
+	if err != nil {
+		t.Fatalf("couldn't read secret")
+	}
+	if s.Data == nil {
+		t.Fatalf("empty data?")
+	}
+	foundSecret, found := s.Data[secretName]
+	if !found {
+		t.Fatalf("secret '%s' not found in %+v", secretName, s.Data)
+	}
+
+	if foundSecret != secret {
+		t.Fatalf("found: %s, expected: %s", foundSecret, secret)
+	}
+}

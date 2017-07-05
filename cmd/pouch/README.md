@@ -44,6 +44,9 @@ secrets:
   name:
     vault_url: <Vault HTTP API url>
     http_method: <HTTP method to use to request secrets>
+    data:
+      <key>: <value>
+      <...>
     files:
     - path: <path to file to create>
       mode: <mode for the file and subdirectories if they are created>
@@ -58,6 +61,8 @@ Map of secrets to be retrieved from Vault using its [HTTP API](https://www.vault
 Secrets are retrieved using the configured AppRole, so obviously this AppRole
 needs to have permissions to do these requests. Requests are done using HTTP,
 to the `vault_url` using the specified `http_method`.
+Payload can be added to the request using the `data` field, any value is
+allowed.
 Once retrieved a list of `files` are provisioned using the JSON response from
 Vault.
 
