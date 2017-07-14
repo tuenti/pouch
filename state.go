@@ -46,11 +46,11 @@ type PouchState struct {
 	Secrets map[string]*SecretState `json:"secrets,omitempty"`
 
 	// Path from where this state was read
-	path string
+	Path string
 }
 
 func NewState(path string) *PouchState {
-	return &PouchState{path: path}
+	return &PouchState{Path: path}
 }
 
 func LoadState(path string) (*PouchState, error) {
@@ -66,12 +66,12 @@ func LoadState(path string) (*PouchState, error) {
 	if err != nil {
 		return nil, err
 	}
-	state.path = path
+	state.Path = path
 	return &state, nil
 }
 
 func (s *PouchState) Save() error {
-	path := s.path
+	path := s.Path
 	if path == "" {
 		path = DefaultStatePath
 	}

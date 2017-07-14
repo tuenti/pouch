@@ -51,7 +51,7 @@ func main() {
 
 	state, err := pouch.LoadState(pouchfile.StatePath)
 	if err == nil {
-		log.Printf("Using state stored in %s", pouchfile.StatePath)
+		log.Printf("Using state stored in %s", state.Path)
 		pouchfile.Vault.Token = state.Token
 	} else {
 		log.Printf("Couldn't load state: %s, starting from scratch", err)
