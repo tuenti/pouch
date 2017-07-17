@@ -51,7 +51,7 @@ secrets:
     - path: <path to file to create>
       mode: <mode for the file and subdirectories if they are created>
       template: <inline template for the file>
-      templateFile: <path to file containing a template>
+      template_file: <path to file containing a template>
       notify:
       - <notifier>
       <...>
