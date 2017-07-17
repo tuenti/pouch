@@ -79,7 +79,7 @@ func getFileContent(fc FileConfig, data interface{}) (string, error) {
 			return "", err
 		}
 	default:
-		return "", fmt.Errorf("no content defined for file")
+		return "", fmt.Errorf("no content defined for file %s", fc.Path)
 	}
 	var b bytes.Buffer
 	err = t.Execute(&b, data)
