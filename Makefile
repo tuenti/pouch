@@ -1,4 +1,4 @@
-VERSION := 0.4.3
+VERSION := 0.4.4
 
 BASE_DOCKER_REPOSITORY := tuenti
 
