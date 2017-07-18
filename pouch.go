@@ -100,8 +100,40 @@ func dirMode(mode os.FileMode) os.FileMode {
 	return result
 }
 
+var dataFuncMap = template.FuncMap{
+	"env":      os.Getenv,
+	"hostname": os.Hostname,
+}
+
+func resolveData(data map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for k, d := range data {
+		resolved, err := func() (interface{}, error) {
+			v, ok := d.(string)
+			if !ok {
+				return d, nil
+			}
+			t, err := template.New("secret-data").Funcs(dataFuncMap).Parse(v)
+			if err != nil {
+				return d, err
+			}
+			var b bytes.Buffer
+			err = t.Execute(&b, nil)
+			if err != nil {
+				return d, err
+			}
+			return b.String(), nil
+		}()
+		if err != nil {
+			log.Printf("When resolving data template '%s' for '%s': %v", d, k, err)
+		}
+		result[k] = resolved
+	}
+	return result
+}
+
 func (p *pouch) resolveSecret(name string, c SecretConfig) error {
-	options := &vault.RequestOptions{Data: c.Data}
+	options := &vault.RequestOptions{Data: resolveData(c.Data)}
 	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
 	if err != nil {
 		return err

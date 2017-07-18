@@ -185,3 +185,22 @@ func TestDirPerms(t *testing.T) {
 		assert.Equal(t, c.dirMode.String(), d.String())
 	}
 }
+
+func TestResolveDataTemplates(t *testing.T) {
+	env := "TESTENV"
+	envValue := "foo"
+	os.Setenv(env, envValue)
+	defer os.Unsetenv(env)
+
+	hostname, _ := os.Hostname()
+
+	data := map[string]interface{}{
+		"env":      "{{ env \"TESTENV\" }}",
+		"hostname": "{{ hostname }}",
+	}
+
+	resolvedData := resolveData(data)
+
+	assert.Equal(t, envValue, resolvedData["env"])
+	assert.Equal(t, hostname, resolvedData["hostname"])
+}
