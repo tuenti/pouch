@@ -46,7 +46,7 @@ type PouchState struct {
 	Secrets map[string]*SecretState `json:"secrets,omitempty"`
 
 	// Path from where this state was read
-	Path string
+	Path string `json:"-"`
 }
 
 func NewState(path string) *PouchState {
@@ -142,6 +142,7 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 		Name:          name,
 		Timestamp:     time.Now(),
 		LeaseDuration: secret.LeaseDuration,
+		Data:          secret.Data,
 	}
 	if secret.Data != nil {
 		ttlNumber, ok := secret.Data["ttl"].(json.Number)
@@ -209,6 +210,9 @@ type SecretState struct {
 
 	// If the secret has no expiration data, don't try to update it
 	DisableAutoUpdate bool `json:"disable_auto_uptdate,omitempty"`
+
+	// Actual secret
+	Data map[string]interface{} `json:"data,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
