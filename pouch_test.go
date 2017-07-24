@@ -47,8 +47,11 @@ func TestPouchRun(t *testing.T) {
 		SecretID: "secret",
 
 		Responses: map[string]*api.Secret{
-			"GET/v1/foo": &api.Secret{
+			"GET/v1/foo1": &api.Secret{
 				Data: map[string]interface{}{"foo": "secretfoo", "bar": "secretbar"},
+			},
+			"GET/v1/foo2": &api.Secret{
+				Data: map[string]interface{}{"baz": "secretbaz", "stuff": "secretstuff"},
 			},
 		},
 	}
@@ -58,19 +61,24 @@ func TestPouchRun(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 	secrets := map[string]SecretConfig{
-		"foo": {
-			VaultURL:   "/v1/foo",
+		"foo1": {
+			VaultURL:   "/v1/foo1",
 			HTTPMethod: "GET",
-			Files: []FileConfig{
-				{Path: path.Join(tmpdir, "foo"), Template: "{{ .foo }}"},
-				{Path: path.Join(tmpdir, "bar"), Template: "{{ .bar }}"},
-			},
 		},
+		"foo2": {
+			VaultURL:   "/v1/foo2",
+			HTTPMethod: "GET",
+		},
+	}
+
+	files := []FileConfig{
+		{Path: path.Join(tmpdir, "foo"), Template: `{{ secret "foo1" "foo" }}`},
+		{Path: path.Join(tmpdir, "bar"), Template: `{{ secret "foo1" "foo" }} {{ secret "foo2" "baz"}}`},
 	}
 
 	state, cleanup := newTestState()
 	defer cleanup()
-	pouch := NewPouch(state, v, secrets, nil)
+	pouch := NewPouch(state, v, secrets, files, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	finished := make(chan error)
@@ -93,7 +101,7 @@ func TestPouchRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, string(d), "secretbar", "File content should be the secret")
+	assert.Equal(t, string(d), "secretfoo secretbaz", "File content should be the secret")
 }
 
 func TestPouchWatch(t *testing.T) {
@@ -128,15 +136,16 @@ func TestPouchWatch(t *testing.T) {
 		"foo": {
 			VaultURL:   "/v1/foo",
 			HTTPMethod: "GET",
-			Files: []FileConfig{
-				{Path: path.Join(tmpdir, "foo"), Template: "{{ .foo }}"},
-			},
 		},
+	}
+
+	files := []FileConfig{
+		{Path: path.Join(tmpdir, "foo"), Template: `{{ secret "foo" "foo" }}`},
 	}
 
 	state, cleanup := newTestState()
 	defer cleanup()
-	pouch := NewPouch(state, v, secrets, nil)
+	pouch := NewPouch(state, v, secrets, files, nil)
 
 	w, err := fsnotify.NewWatcher()
 	if err != nil {

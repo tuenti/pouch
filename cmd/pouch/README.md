@@ -47,14 +47,6 @@ secrets:
     data:
       <key>: <value>
       <...>
-    files:
-    - path: <path to file to create>
-      mode: <mode for the file and subdirectories if they are created>
-      template: <inline template for the file>
-      template_file: <path to file containing a template>
-      notify:
-      - <notifier>
-      <...>
   <...>
 ```
 Map of secrets to be retrieved from Vault using its [HTTP API](https://www.vaultproject.io/api/index.html).
@@ -67,9 +59,6 @@ in that case these functions are available:
 * `env`: to get environment variables
 * `hostname`: to get the hostname
 
-Once retrieved a list of `files` are provisioned using the JSON response from
-Vault.
-
 ```
 notifiers:
   name:
@@ -80,6 +69,26 @@ Map of notifiers that can be used to notify changes on files. It is intended
 to reload services or any other required trigger. It is specified as a
 `command` that is run inside a shell, and `timeout` as a maximum execution
 time.
+
+```
+files:
+- path: <path to file to create>
+  mode: <mode for the file and subdirectories if they are created>
+  template: <inline template for the file>
+  template_file: <path to file containing a template>
+  notify:
+  - <notifier>
+  <...>
+```
+Files to be provisioned using defined secrets. When the file is written, the
+list of notifiers are executed.
+The content of the file must be specified using a template, this template
+can be defined inline on the `template` attribute, or in a file with the
+`templateFile` attribute.
+Access to secrets from templates is done by using the `secret` function. This
+function has two arguments, first one the name of the secret and second one
+the key of the value inside the secret.
+Files are automatically updated when a secret they use is requested again.
 
 As an example:
 
@@ -95,18 +104,19 @@ secrets:
   - vault_url: /v1/kubernetes-pki/issue/kubelet
     http_method: POST
     files:
-    - path: /etc/kubernetes/ssl/client.key
-      mode: 0600
-      template: |
-        {{ .private_key }}
-    - path: /etc/kubernetes/ssl/client.crt
-      mode: 0600
-      template: |
-        {{ .certificate }}
-    - path: /etc/kubernetes/ssl/ca.crt
-      mode: 0600
-      template: |
-        {{ .issuing_ca }}
+files:
+- path: /etc/kubernetes/ssl/client.key
+  mode: 0600
+  template: |
+    {{ secret "kubelet_certs" "private_key" }}
+- path: /etc/kubernetes/ssl/client.crt
+  mode: 0600
+  template: |
+    {{ secret "kubelet_certs" "certificate" }}
+- path: /etc/kubernetes/ssl/ca.crt
+  mode: 0600
+  template: |
+    {{ secret "kubelet_certs" "issuing_ca" }}
 
 ```
 
