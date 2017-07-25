@@ -73,6 +73,8 @@ type FileConfig struct {
 
 type NotifierConfig struct {
 	Command string `json:"command,omitempty"`
+	Service string `json:"service,omitempty"`
+
 	Timeout string `json:"timeout,omitempty"`
 }
 

@@ -17,12 +17,14 @@ limitations under the License.
 package systemd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/coreos/go-systemd/daemon"
+	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/util"
 )
 
@@ -33,6 +35,7 @@ type SystemD interface {
 	Close()
 
 	NotifyReady() error
+	Reload(context.Context, string) error
 }
 
 type SystemdConfigurer interface {
@@ -117,6 +120,29 @@ func (s *systemd) NotifyReady() error {
 	}
 	if !sent {
 		return fmt.Errorf("ready notification to systemd was not sent")
+	}
+	return nil
+}
+
+func (s *systemd) Reload(ctx context.Context, name string) error {
+	c, err := dbus.New()
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	result := make(chan string, 1)
+	_, err = c.ReloadOrRestartUnit(name, "replace", result)
+	if err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case r := <-result:
+		if r != "done" {
+			return fmt.Errorf("reload job for %s is not done (found: %s)", name, r)
+		}
 	}
 	return nil
 }
