@@ -46,7 +46,7 @@ type PouchState struct {
 	Secrets map[string]*SecretState `json:"secrets,omitempty"`
 
 	// Path from where this state was read
-	Path string
+	Path string `json:"-"`
 }
 
 func NewState(path string) *PouchState {
@@ -142,6 +142,7 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 		Name:          name,
 		Timestamp:     time.Now(),
 		LeaseDuration: secret.LeaseDuration,
+		Data:          secret.Data,
 	}
 	if secret.Data != nil {
 		ttlNumber, ok := secret.Data["ttl"].(json.Number)
@@ -166,6 +167,10 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 				break
 			}
 		}
+	}
+
+	if oldState, found := s.Secrets[name]; found {
+		state.FilesUsing = oldState.FilesUsing
 	}
 	s.Secrets[name] = state
 }
@@ -209,6 +214,12 @@ type SecretState struct {
 
 	// If the secret has no expiration data, don't try to update it
 	DisableAutoUpdate bool `json:"disable_auto_uptdate,omitempty"`
+
+	// Actual secret
+	Data map[string]interface{} `json:"data,omitempty"`
+
+	// Files using this secret
+	FilesUsing []string `json:"files_using,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
@@ -239,4 +250,18 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 	}
 
 	return (time.Duration(float64(duration)*ratio) * time.Second) - time.Now().Sub(s.Timestamp)
+}
+
+func (s *SecretState) RegisterUsage(path string) {
+	if s.FilesUsing == nil {
+		s.FilesUsing = []string{path}
+		return
+	}
+	for _, f := range s.FilesUsing {
+		if f == path {
+			// Already registered
+			return
+		}
+	}
+	s.FilesUsing = append(s.FilesUsing, path)
 }

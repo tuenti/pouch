@@ -60,7 +60,7 @@ func main() {
 
 	vault := vault.New(pouchfile.Vault)
 
-	p := pouch.NewPouch(state, vault, pouchfile.Secrets, pouchfile.Notifiers)
+	p := pouch.NewPouch(state, vault, pouchfile.Secrets, pouchfile.Files, pouchfile.Notifiers)
 
 	systemd := systemd.New(pouchfile.Systemd.Configurer())
 	if systemd.IsAvailable() && systemd.CanNotify() {

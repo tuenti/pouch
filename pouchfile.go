@@ -34,6 +34,7 @@ type Pouchfile struct {
 	Systemd   SystemdConfig             `json:"systemd,omitempty"`
 	Notifiers map[string]NotifierConfig `json:"notifiers,omitempty"`
 	Secrets   map[string]SecretConfig   `json:"secrets,omitempty"`
+	Files     []FileConfig              `json:"files,omitempty"`
 }
 
 type SystemdConfig struct {
@@ -60,7 +61,6 @@ type SecretConfig struct {
 	VaultURL   string                 `json:"vault_url,omitempty"`
 	HTTPMethod string                 `json:"http_method,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`
-	Files      []FileConfig           `json:"files,omitempty"`
 }
 
 type FileConfig struct {

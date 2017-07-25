@@ -55,26 +55,30 @@ type pouch struct {
 
 	Vault     vault.Vault
 	Secrets   map[string]SecretConfig
+	Files     map[string]FileConfig
 	Notifiers map[string]NotifierConfig
 
 	statusNotifiers  []StatusNotifier
 	pendingNotifiers map[string]bool
 }
 
-func getFileContent(fc FileConfig, data interface{}) (string, error) {
+func getFileContent(fc FileConfig, data interface{}, secretFunc interface{}) (string, error) {
 	if fc.Template != "" && fc.TemplateFile != "" {
 		return "", fmt.Errorf("inline template and template file specified")
 	}
 	var t *template.Template
+	funcMap := template.FuncMap{
+		"secret": secretFunc,
+	}
 	var err error
 	switch {
 	case fc.Template != "":
-		t, err = template.New("file").Parse(fc.Template)
+		t, err = template.New("inline-template").Funcs(funcMap).Parse(fc.Template)
 		if err != nil {
 			return "", err
 		}
 	case fc.TemplateFile != "":
-		t, err = template.ParseFiles(fc.TemplateFile)
+		t, err = template.New("template-file").Funcs(funcMap).ParseFiles(fc.TemplateFile)
 		if err != nil {
 			return "", err
 		}
@@ -139,29 +143,44 @@ func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 		return err
 	}
 	p.State.SetSecret(name, s)
-	for _, fc := range c.Files {
-		mode := os.FileMode(fc.Mode)
-		if mode == 0 {
-			mode = DefaultFileMode
-		}
-		dir := path.Dir(fc.Path)
-		err := os.MkdirAll(dir, dirMode(mode))
-		if err != nil {
-			return err
-		}
+	return nil
+}
 
-		content, err := getFileContent(fc, s.Data)
-		if err != nil {
-			return err
-		}
-
-		err = ioutil.WriteFile(fc.Path, []byte(content), mode)
-		if err != nil {
-			return fmt.Errorf("couldn't write secret in '%s': %s", fc.Path, err)
-		}
-
-		p.addForNotify(fc.Notify...)
+func (p *pouch) resolveFile(fc FileConfig) error {
+	mode := os.FileMode(fc.Mode)
+	if mode == 0 {
+		mode = DefaultFileMode
 	}
+	dir := path.Dir(fc.Path)
+	err := os.MkdirAll(dir, dirMode(mode))
+	if err != nil {
+		return err
+	}
+
+	secretFunc := func(name, key string) (interface{}, error) {
+		secret, found := p.State.Secrets[name]
+		if !found {
+			return nil, fmt.Errorf("unknown secret: %s", name)
+		}
+		value, found := secret.Data[key]
+		if !found {
+			return nil, fmt.Errorf("unkown key in secret '%s': %s", name, key)
+		}
+		secret.RegisterUsage(fc.Path)
+		return value, nil
+	}
+
+	content, err := getFileContent(fc, nil, secretFunc)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(fc.Path, []byte(content), mode)
+	if err != nil {
+		return fmt.Errorf("couldn't write secret in '%s': %s", fc.Path, err)
+	}
+
+	p.addForNotify(fc.Notify...)
 	return nil
 }
 
@@ -177,7 +196,11 @@ func (p *pouch) Run(ctx context.Context) error {
 	}
 
 	for name, c := range p.Secrets {
-		if _, found := p.State.Secrets[name]; !found {
+		if s, found := p.State.Secrets[name]; found {
+			// Clean files using this secret, we'll process templates in case
+			// someone has changed
+			s.FilesUsing = nil
+		} else {
 			err = p.resolveSecret(name, c)
 			if err != nil {
 				return err
@@ -188,6 +211,13 @@ func (p *pouch) Run(ctx context.Context) error {
 	for name := range p.State.Secrets {
 		if _, found := p.Secrets[name]; !found {
 			p.State.DeleteSecret(name)
+		}
+	}
+
+	for _, fc := range p.Files {
+		err := p.resolveFile(fc)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -216,14 +246,24 @@ func (p *pouch) Run(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			for _, f := range p.State.Secrets[s.Name].FilesUsing {
+				err = p.resolveFile(p.Files[f])
+				if err != nil {
+					return err
+				}
+			}
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func NewPouch(s *PouchState, vc vault.Vault, sc map[string]SecretConfig, nc map[string]NotifierConfig) Pouch {
-	return &pouch{State: s, Vault: vc, Secrets: sc, Notifiers: nc}
+func NewPouch(s *PouchState, vc vault.Vault, sc map[string]SecretConfig, fc []FileConfig, nc map[string]NotifierConfig) Pouch {
+	fileMap := make(map[string]FileConfig)
+	for _, f := range fc {
+		fileMap[f.Path] = f
+	}
+	return &pouch{State: s, Vault: vc, Secrets: sc, Files: fileMap, Notifiers: nc}
 }
 
 func (p *pouch) AddStatusNotifier(n StatusNotifier) {
