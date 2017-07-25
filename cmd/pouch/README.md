@@ -72,10 +72,20 @@ notifiers:
     command: <command>
     timeout: <command timeout>
 ```
+Or
+```
+  name:
+    service: <service name>
+    timeout: <restart timeout>
+```
 Map of notifiers that can be used to notify changes on files. It is intended
-to reload services or any other required trigger. It is specified as a
-`command` that is run inside a shell, and `timeout` as a maximum execution
-time.
+to reload services or any other required trigger. It can be specified with one
+of:
+* `command`, with a command to be run inside a shell.
+* `service`, with the name of a service to be reloaded by the service manager,
+  currently only systemd is supported.
+
+A `timeout` can be also specified as the maximum time for the notification.
 
 ```
 files:
