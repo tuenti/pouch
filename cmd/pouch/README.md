@@ -21,6 +21,13 @@ Path where `pouch` expects to find the wrapped secret ID, if this file is
 empty or doesn't exist, `pouch` waits for it to contain a wrapped secret ID.
 
 ```
+state_path: <path>
+```
+Path where `pouch` will store its state, this includes current token, all
+retrieved secrets and information about its renovation.
+
+
+```
 vault:
   address: <vault address>
   role_id: <role ID>
