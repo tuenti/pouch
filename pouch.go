@@ -147,6 +147,10 @@ func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 		return err
 	}
 	p.State.SetSecret(name, s)
+	err = p.State.Save()
+	if err != nil {
+		log.Printf("Couldn't save state: %s", err)
+	}
 	return nil
 }
 
