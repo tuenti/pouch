@@ -71,9 +71,16 @@ func TestPouchRun(t *testing.T) {
 		},
 	}
 
+	templateFile := path.Join(tmpdir, "template")
+	err = ioutil.WriteFile(templateFile, []byte(`{{ secret "foo1" "foo" }}`), 0444)
+	if err != nil {
+		t.Fatalf("couldn't write template: %s", err)
+	}
+
 	files := []FileConfig{
 		{Path: path.Join(tmpdir, "foo"), Template: `{{ secret "foo1" "foo" }}`},
 		{Path: path.Join(tmpdir, "bar"), Template: `{{ secret "foo1" "foo" }} {{ secret "foo2" "baz"}}`},
+		{Path: path.Join(tmpdir, "foo-template"), TemplateFile: templateFile},
 	}
 
 	state, cleanup := newTestState()
@@ -102,6 +109,12 @@ func TestPouchRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, string(d), "secretfoo secretbaz", "File content should be the secret")
+
+	d, err = ioutil.ReadFile(path.Join(tmpdir, "foo-template"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, string(d), "secretfoo", "File content should be the secret")
 }
 
 func TestPouchWatch(t *testing.T) {

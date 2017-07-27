@@ -78,7 +78,11 @@ func getFileContent(fc FileConfig, data interface{}, secretFunc interface{}) (st
 			return "", err
 		}
 	case fc.TemplateFile != "":
-		t, err = template.New("template-file").Funcs(funcMap).ParseFiles(fc.TemplateFile)
+		d, err := ioutil.ReadFile(fc.TemplateFile)
+		if err != nil {
+			return "", err
+		}
+		t, err = template.New(fc.TemplateFile).Funcs(funcMap).Parse(string(d))
 		if err != nil {
 			return "", err
 		}
