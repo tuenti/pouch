@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"text/template"
 	"time"
@@ -32,14 +31,14 @@ import (
 )
 
 const (
-	DefaultNotifyTimeout = 5 * time.Minute
-	DefaultFileMode      = os.FileMode(0600)
+	DefaultFileMode = os.FileMode(0600)
 )
 
 type Pouch interface {
 	Run(context.Context) error
 	Watch(path string) error
 	AddStatusNotifier(StatusNotifier)
+	ServiceReloader(Reloader)
 }
 
 type StatusNotifier interface {
@@ -47,7 +46,7 @@ type StatusNotifier interface {
 }
 
 type Reloader interface {
-	Reload(string) error
+	Reload(context.Context, string) error
 }
 
 type pouch struct {
@@ -57,6 +56,7 @@ type pouch struct {
 	Secrets   map[string]SecretConfig
 	Files     map[string]FileConfig
 	Notifiers map[string]NotifierConfig
+	Reloader  Reloader
 
 	statusNotifiers  []StatusNotifier
 	pendingNotifiers map[string]bool
@@ -266,6 +266,10 @@ func NewPouch(s *PouchState, vc vault.Vault, sc map[string]SecretConfig, fc []Fi
 	return &pouch{State: s, Vault: vc, Secrets: sc, Files: fileMap, Notifiers: nc}
 }
 
+func (p *pouch) ServiceReloader(r Reloader) {
+	p.Reloader = r
+}
+
 func (p *pouch) AddStatusNotifier(n StatusNotifier) {
 	p.statusNotifiers = append(p.statusNotifiers, n)
 }
@@ -292,31 +296,5 @@ func (p *pouch) notifyPending() {
 	for pending := range p.pendingNotifiers {
 		p.Notify(pending)
 		delete(p.pendingNotifiers, pending)
-	}
-}
-
-func (p *pouch) Notify(name string) {
-	notifier, found := p.Notifiers[name]
-	if !found {
-		log.Printf("Couldn't find notifier for '%s'", name)
-	}
-	timeout := DefaultNotifyTimeout
-	if notifier.Timeout != "" {
-		t, err := time.ParseDuration(notifier.Timeout)
-		if err == nil {
-			timeout = t
-		} else {
-			log.Printf("Incorrect timeout: %s", err)
-		}
-	}
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	cmd := exec.CommandContext(ctx, "sh", "-c", notifier.Command)
-	cmd.Stdin = nil
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("Notification to '%s' failed: %s", name, err)
-		if len(out) > 0 {
-			log.Println(string(out))
-		}
 	}
 }

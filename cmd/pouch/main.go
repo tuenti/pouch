@@ -63,8 +63,11 @@ func main() {
 	p := pouch.NewPouch(state, vault, pouchfile.Secrets, pouchfile.Files, pouchfile.Notifiers)
 
 	systemd := systemd.New(pouchfile.Systemd.Configurer())
-	if systemd.IsAvailable() && systemd.CanNotify() {
-		p.AddStatusNotifier(systemd)
+	if systemd.IsAvailable() {
+		p.ServiceReloader(systemd)
+		if systemd.CanNotify() {
+			p.AddStatusNotifier(systemd)
+		}
 	}
 	defer systemd.Close()
 
