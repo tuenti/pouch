@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/hashicorp/vault/api"
@@ -196,6 +197,13 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	return
 }
 
+type JSONSortedStringList []string
+
+func (s JSONSortedStringList) MarshalJSON() ([]byte, error) {
+	sort.Strings(s)
+	return json.Marshal([]string(s))
+}
+
 type SecretState struct {
 	// Secret name
 	Name string `json:"name,omitempty"`
@@ -219,7 +227,7 @@ type SecretState struct {
 	Data map[string]interface{} `json:"data,omitempty"`
 
 	// Files using this secret
-	FilesUsing []string `json:"files_using,omitempty"`
+	FilesUsing JSONSortedStringList `json:"files_using,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
