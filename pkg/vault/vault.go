@@ -107,9 +107,9 @@ func (v *vaultApi) autoRenewToken() {
 		for attempt := 0; attempt < attempts; attempt++ {
 			err = f()
 			if err == nil {
-				<-time.After(t)
 				break
 			}
+			<-time.After(t)
 		}
 	}
 
