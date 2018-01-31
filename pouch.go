@@ -174,7 +174,7 @@ func (p *pouch) resolveFile(fc FileConfig) error {
 		if !found {
 			return nil, fmt.Errorf("unkown key in secret '%s': %s", name, key)
 		}
-		secret.RegisterUsage(fc.Path)
+		secret.RegisterUsage(fc.Path, fc.Priority)
 		return value, nil
 	}
 
@@ -255,7 +255,7 @@ func (p *pouch) Run(ctx context.Context) error {
 				return err
 			}
 			for _, f := range p.State.Secrets[s.Name].FilesUsing {
-				err = p.resolveFile(p.Files[f])
+				err = p.resolveFile(p.Files[f.Path])
 				if err != nil {
 					return err
 				}

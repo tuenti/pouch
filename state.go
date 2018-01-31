@@ -197,11 +197,29 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	return
 }
 
-type JSONSortedStringList []string
+type FileSortedList []File
 
-func (s JSONSortedStringList) MarshalJSON() ([]byte, error) {
-	sort.Strings(s)
-	return json.Marshal([]string(s))
+type File struct {
+	Priority int
+	Path     string
+}
+
+func (s FileSortedList) MarshalJSON() ([]byte, error) {
+	sort.Sort(s)
+	var sorted_files []string
+	for _, file := range s {
+		sorted_files = append(sorted_files, file.Path)
+	}
+	return json.Marshal([]string(sorted_files))
+}
+
+func (p FileSortedList) Len() int      { return len(p) }
+func (p FileSortedList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p FileSortedList) Less(i, j int) bool {
+	if p[i].Priority != p[j].Priority {
+		return p[i].Priority < p[j].Priority
+	}
+	return p[i].Path < p[j].Path
 }
 
 type SecretState struct {
@@ -227,7 +245,7 @@ type SecretState struct {
 	Data map[string]interface{} `json:"data,omitempty"`
 
 	// Files using this secret
-	FilesUsing JSONSortedStringList `json:"files_using,omitempty"`
+	FilesUsing FileSortedList `json:"files_using,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
@@ -260,16 +278,12 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 	return (time.Duration(float64(duration)*ratio) * time.Second) - time.Now().Sub(s.Timestamp)
 }
 
-func (s *SecretState) RegisterUsage(path string) {
-	if s.FilesUsing == nil {
-		s.FilesUsing = []string{path}
-		return
-	}
+func (s *SecretState) RegisterUsage(path string, priority int) {
 	for _, f := range s.FilesUsing {
-		if f == path {
+		if f.Path == path {
 			// Already registered
 			return
 		}
 	}
-	s.FilesUsing = append(s.FilesUsing, path)
+	s.FilesUsing = append(s.FilesUsing, File{Priority: priority, Path: path})
 }
