@@ -155,7 +155,7 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 		}
 	}
 
-	if state.TimeToUpdate() == 0 {
+	if _, known := state.TimeToUpdate(); !known {
 		// Without a known TTU, we don't know when to update
 		state.DisableAutoUpdate = true
 
@@ -180,19 +180,16 @@ func (s *PouchState) DeleteSecret(name string) {
 	delete(s.Secrets, name)
 }
 
-func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
+func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Time) {
 	for name := range s.Secrets {
 		if s.Secrets[name].DisableAutoUpdate {
 			continue
 		}
-		ttu := s.Secrets[name].TimeToUpdate()
-		if secret == nil || ttu < minTTU {
+		ttu, known := s.Secrets[name].TimeToUpdate()
+		if known && (secret == nil || ttu.Before(minTTU)) {
 			secret = s.Secrets[name]
 			minTTU = ttu
 		}
-	}
-	if minTTU < 0 {
-		minTTU = 0
 	}
 	return
 }
@@ -259,7 +256,7 @@ type SecretState struct {
 	FilesUsing PriorityFileSortedList `json:"files_using,omitempty"`
 }
 
-func (s *SecretState) TimeToUpdate() time.Duration {
+func (s *SecretState) TimeToUpdate() (time.Time, bool) {
 	ratio := s.DurationRatio
 	if ratio == 0 {
 		ratio = DefaultSecretDurationRatio
@@ -283,10 +280,10 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 		duration = s.LeaseDuration
 	default:
 		// Unknown TTU
-		return 0
+		return time.Time{}, false
 	}
 
-	return (time.Duration(float64(duration)*ratio) * time.Second) - time.Now().Sub(s.Timestamp)
+	return s.Timestamp.Add(time.Duration(float64(duration)*ratio) * time.Second), true
 }
 
 func (s *SecretState) RegisterUsage(path string, priority int) {

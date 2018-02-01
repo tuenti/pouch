@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
 var filesUsingCases = []struct {
@@ -130,6 +131,44 @@ func TestFilesUsingBySecrets(t *testing.T) {
 		if string(jsonSaved) != string(jsonLoaded) {
 			t.Fatalf("JSON saved and read are differents\n%s\n%s\n", jsonSaved, jsonLoaded)
 		}
+	}
+}
 
+var secretCaseTTL = &SecretState{TTL: 360, Timestamp: time.Time{}, DurationRatio: 0.5}
+var unknownTTL = &SecretState{Timestamp: time.Time{}}
+
+var nextUpdateCases = []struct {
+	State  PouchState
+	Secret *SecretState
+	TTU    time.Time
+}{
+	// No secrets
+	{PouchState{}, nil, time.Time{}},
+
+	// Secret without TTL
+	{PouchState{
+		Secrets: map[string]*SecretState{
+			"unknown": unknownTTL,
+		},
+	}, nil, time.Time{}},
+
+	// A secret with TTL, other unknown
+	{PouchState{
+		Secrets: map[string]*SecretState{
+			"foo":     secretCaseTTL,
+			"unknown": unknownTTL,
+		},
+	}, secretCaseTTL, time.Time{}.Add(180 * time.Second)},
+}
+
+func TestPouchStateNextUpdate(t *testing.T) {
+	for i, c := range nextUpdateCases {
+		foundSecret, foundTTU := c.State.NextUpdate()
+		if foundSecret != c.Secret {
+			t.Fatalf("Case #%d: found secret %v, expected %v", i, foundSecret, c.Secret)
+		}
+		if foundSecret != nil && foundTTU != c.TTU {
+			t.Fatalf("Case #%d: found TTU %s, expected %s", i, foundTTU, c.TTU)
+		}
 	}
 }

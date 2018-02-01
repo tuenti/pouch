@@ -242,7 +242,7 @@ func (p *pouch) Run(ctx context.Context) error {
 		var nextUpdate <-chan time.Time
 		s, ttu := p.State.NextUpdate()
 		if s != nil {
-			nextUpdate = time.After(ttu)
+			nextUpdate = time.After(time.Until(ttu))
 		} else {
 			log.Printf("No secret to update")
 		}
