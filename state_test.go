@@ -168,6 +168,14 @@ var secretWithCertificate = &SecretState{Timestamp: time.Time{}, DurationRatio: 
 var secretBeforeCertificate = &SecretState{TTL: 60, Timestamp: testCertNotBefore, DurationRatio: 0.5}
 var secretAfterCertificate = &SecretState{TTL: 60, Timestamp: testCertNotAfter, DurationRatio: 0.5}
 
+var allSecretCases = []*SecretState{
+	secretCaseTTL,
+	unknownTTL,
+	secretWithCertificate,
+	secretBeforeCertificate,
+	secretAfterCertificate,
+}
+
 var nextUpdateCases = []struct {
 	State  PouchState
 	Secret *SecretState
@@ -223,6 +231,16 @@ func TestPouchStateNextUpdate(t *testing.T) {
 		}
 		if foundSecret != nil && foundTTU != c.TTU {
 			t.Fatalf("Case #%d: found TTU %s, expected %s", i, foundTTU, c.TTU)
+		}
+	}
+}
+
+func TestConsistentTTU(t *testing.T) {
+	for _, c := range allSecretCases {
+		firstTTU, firstKnown := c.TimeToUpdate()
+		secondTTU, secondKnown := c.TimeToUpdate()
+		if firstTTU != secondTTU || firstKnown != secondKnown {
+			t.Fatalf("TTU changed after some time for %+v", c)
 		}
 	}
 }
