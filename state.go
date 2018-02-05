@@ -107,10 +107,33 @@ func (s *PouchState) Save() error {
 	return ioutil.WriteFile(path, d, DefaultStateMode)
 }
 
-// Alternative sources of TTUs if no TTL or lease
-// duration has been found before
+// Sources of TTUs
 var secretTTUSources = []func(*SecretState) (*time.Time, error){
+	ttuFromTTLOrLeaseDuration,
 	ttuFromCertificateValidity,
+}
+
+func ttuFromTTLOrLeaseDuration(s *SecretState) (*time.Time, error) {
+	ttl, ttlKnown := s.TTL()
+
+	var duration int
+	switch {
+	case ttlKnown && s.LeaseDuration > 0:
+		if ttl < s.LeaseDuration {
+			duration = ttl
+		} else {
+			duration = s.LeaseDuration
+		}
+	case ttlKnown:
+		duration = ttl
+	case s.LeaseDuration > 0:
+		duration = s.LeaseDuration
+	default:
+		return nil, nil
+	}
+
+	ttu := s.Timestamp.Add(time.Duration(float64(duration)*s.Ratio()) * time.Second)
+	return &ttu, nil
 }
 
 func ttuFromCertificateValidity(s *SecretState) (*time.Time, error) {
@@ -267,41 +290,17 @@ func (s *SecretState) TTL() (int, bool) {
 }
 
 func (s *SecretState) TimeToUpdate() (time.Time, bool) {
-	// Next update for the secret will be based on these rules:
-	// - If we have both a TTL and a lease duration, we use the minimal of them
-	// - If we have only a TTL or a lease duration, we take it
-	// - If we don't have TTL or lease duration, we try other sources
-	// - If we don't have anything, we won't try to update this secret
-	ttl, ttlKnown := s.TTL()
-
-	var duration int
-	switch {
-	case ttlKnown && s.LeaseDuration > 0:
-		if ttl < s.LeaseDuration {
-			duration = ttl
-		} else {
-			duration = s.LeaseDuration
+	for _, source := range secretTTUSources {
+		ttu, err := source(s)
+		if err != nil {
+			log.Printf("Error trying to obtain TTU for secret '%s': %s", s.Name, err)
+			continue
 		}
-	case ttlKnown:
-		duration = ttl
-	case s.LeaseDuration > 0:
-		duration = s.LeaseDuration
-	default:
-		// Look for some expiration time in the secret itself
-		for _, source := range secretTTUSources {
-			ttu, err := source(s)
-			if err != nil {
-				log.Println("Error obtaining TTU from alternative sources: ", err)
-				continue
-			}
-			if ttu != nil {
-				return *ttu, true
-			}
+		if ttu != nil {
+			return *ttu, true
 		}
-		return time.Time{}, false
 	}
-
-	return s.Timestamp.Add(time.Duration(float64(duration)*s.Ratio()) * time.Second), true
+	return time.Time{}, false
 }
 
 func (s *SecretState) RegisterUsage(path string, priority int) {
