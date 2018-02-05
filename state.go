@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -106,33 +107,35 @@ func (s *PouchState) Save() error {
 	return ioutil.WriteFile(path, d, DefaultStateMode)
 }
 
-// Alternative sources of TTLs if no other TTL or lease
+// Alternative sources of TTUs if no TTL or lease
 // duration has been found before
-var secretTTLSources = []func(*api.Secret) (int, error){
-	ttlFromCertificateValidity,
+var secretTTUSources = []func(*SecretState) (*time.Time, error){
+	ttuFromCertificateValidity,
 }
 
-func ttlFromCertificateValidity(s *api.Secret) (int, error) {
+func ttuFromCertificateValidity(s *SecretState) (*time.Time, error) {
 	if s.Data == nil {
-		return 0, nil
+		return nil, nil
 	}
 
 	data, ok := s.Data["certificate"].(string)
 	if !ok {
-		return 0, nil
+		return nil, nil
 	}
 
 	block, _ := pem.Decode([]byte(data))
 	if block == nil {
-		return 0, fmt.Errorf("failed to parse certificate PEM")
+		return nil, fmt.Errorf("failed to parse certificate PEM")
 	}
 
 	certificate, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return int(certificate.NotAfter.Sub(time.Now()).Seconds()), nil
+	ttl := certificate.NotAfter.Sub(certificate.NotBefore)
+	ttu := certificate.NotBefore.Add(time.Duration(float64(ttl) * s.Ratio()))
+	return &ttu, nil
 }
 
 func (s *PouchState) SetSecret(name string, secret *api.Secret) {
@@ -158,16 +161,6 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 	if _, known := state.TimeToUpdate(); !known {
 		// Without a known TTU, we don't know when to update
 		state.DisableAutoUpdate = true
-
-		// Look for some expiration time in the secret itself
-		for _, source := range secretTTLSources {
-			ttl, err := source(secret)
-			if err == nil && ttl > 0 {
-				state.TTL = ttl
-				state.DisableAutoUpdate = false
-				break
-			}
-		}
 	}
 
 	if oldState, found := s.Secrets[name]; found {
@@ -256,15 +249,19 @@ type SecretState struct {
 	FilesUsing PriorityFileSortedList `json:"files_using,omitempty"`
 }
 
-func (s *SecretState) TimeToUpdate() (time.Time, bool) {
+func (s *SecretState) Ratio() float64 {
 	ratio := s.DurationRatio
 	if ratio == 0 {
 		ratio = DefaultSecretDurationRatio
 	}
+	return ratio
+}
 
+func (s *SecretState) TimeToUpdate() (time.Time, bool) {
 	// Next update for the secret will be based on these rules:
 	// - If we have both a TTL and a lease duration, we use the minimal of them
 	// - If we have only a TTL or a lease duration, we take it
+	// - If we don't have TTL or lease duration, we try other sources
 	// - If we don't have anything, we won't try to update this secret
 	var duration int
 	switch {
@@ -279,11 +276,21 @@ func (s *SecretState) TimeToUpdate() (time.Time, bool) {
 	case s.LeaseDuration > 0:
 		duration = s.LeaseDuration
 	default:
-		// Unknown TTU
+		// Look for some expiration time in the secret itself
+		for _, source := range secretTTUSources {
+			ttu, err := source(s)
+			if err != nil {
+				log.Println("Error obtaining TTU from alternative sources: ", err)
+				continue
+			}
+			if ttu != nil {
+				return *ttu, true
+			}
+		}
 		return time.Time{}, false
 	}
 
-	return s.Timestamp.Add(time.Duration(float64(duration)*ratio) * time.Second), true
+	return s.Timestamp.Add(time.Duration(float64(duration)*s.Ratio()) * time.Second), true
 }
 
 func (s *SecretState) RegisterUsage(path string, priority int) {
