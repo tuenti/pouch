@@ -162,15 +162,31 @@ hwIhAKsZN5/gMTYToF4ZnMy4aKaKMyd/gSkiPudiYb5OYqyfAiB6EXX7DzjCohUa
 5n1aU0/ed9d2
 -----END PRIVATE KEY-----`
 
-var secretCaseTTL = &SecretState{TTL: 360, Timestamp: time.Time{}, DurationRatio: 0.5}
 var unknownTTL = &SecretState{Timestamp: time.Time{}}
-var secretWithCertificate = &SecretState{Timestamp: time.Time{}, DurationRatio: 0.5, Data: map[string]interface{}{"certificate": testCert, "private_key": testKey}}
-var secretBeforeCertificate = &SecretState{TTL: 60, Timestamp: testCertNotBefore, DurationRatio: 0.5}
-var secretAfterCertificate = &SecretState{TTL: 60, Timestamp: testCertNotAfter, DurationRatio: 0.5}
+var secretCaseTTL = &SecretState{
+	Data:          SecretData{"ttl": json.Number("360")},
+	Timestamp:     time.Time{},
+	DurationRatio: 0.5,
+}
+var secretWithCertificate = &SecretState{
+	Data:          SecretData{"certificate": testCert, "private_key": testKey},
+	Timestamp:     time.Time{},
+	DurationRatio: 0.5,
+}
+var secretBeforeCertificate = &SecretState{
+	Data:          SecretData{"ttl": json.Number("60")},
+	Timestamp:     testCertNotBefore,
+	DurationRatio: 0.5,
+}
+var secretAfterCertificate = &SecretState{
+	Data:          SecretData{"ttl": json.Number("60")},
+	Timestamp:     testCertNotAfter,
+	DurationRatio: 0.5,
+}
 
 var allSecretCases = []*SecretState{
-	secretCaseTTL,
 	unknownTTL,
+	secretCaseTTL,
 	secretWithCertificate,
 	secretBeforeCertificate,
 	secretAfterCertificate,

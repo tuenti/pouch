@@ -148,15 +148,6 @@ func (s *PouchState) SetSecret(name string, secret *api.Secret) {
 		LeaseDuration: secret.LeaseDuration,
 		Data:          secret.Data,
 	}
-	if secret.Data != nil {
-		ttlNumber, ok := secret.Data["ttl"].(json.Number)
-		if ok {
-			ttl, err := ttlNumber.Int64()
-			if err == nil {
-				state.TTL = int(ttl)
-			}
-		}
-	}
 
 	if _, known := state.TimeToUpdate(); !known {
 		// Without a known TTU, we don't know when to update
@@ -223,6 +214,8 @@ func (p PriorityFileSortedList) Less(i, j int) bool {
 	return p[i].Path < p[j].Path
 }
 
+type SecretData map[string]interface{}
+
 type SecretState struct {
 	// Secret name
 	Name string `json:"name,omitempty"`
@@ -233,9 +226,6 @@ type SecretState struct {
 	// Lease duration, in seconds, if any when the secret was read
 	LeaseDuration int `json:"lease_duration,omitempty"`
 
-	// TTL, in seconds, if any when the secret was read
-	TTL int `json:"ttl,omitempty"`
-
 	// Secret will be renewed after this portion of its life has passed
 	DurationRatio float64 `json:"duration_ratio,omitempty"`
 
@@ -243,7 +233,7 @@ type SecretState struct {
 	DisableAutoUpdate bool `json:"disable_auto_uptdate,omitempty"`
 
 	// Actual secret
-	Data map[string]interface{} `json:"data,omitempty"`
+	Data SecretData `json:"data,omitempty"`
 
 	// Files using this secret
 	FilesUsing PriorityFileSortedList `json:"files_using,omitempty"`
@@ -257,22 +247,43 @@ func (s *SecretState) Ratio() float64 {
 	return ratio
 }
 
+func (s *SecretState) TTL() (int, bool) {
+	if s.Data == nil {
+		return 0, false
+	}
+	switch ttlNumber := s.Data["ttl"].(type) {
+	case json.Number:
+		ttl, err := ttlNumber.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(ttl), true
+	case int:
+		return ttlNumber, true
+	case int64:
+		return int(ttlNumber), true
+	}
+	return 0, false
+}
+
 func (s *SecretState) TimeToUpdate() (time.Time, bool) {
 	// Next update for the secret will be based on these rules:
 	// - If we have both a TTL and a lease duration, we use the minimal of them
 	// - If we have only a TTL or a lease duration, we take it
 	// - If we don't have TTL or lease duration, we try other sources
 	// - If we don't have anything, we won't try to update this secret
+	ttl, ttlKnown := s.TTL()
+
 	var duration int
 	switch {
-	case s.TTL > 0 && s.LeaseDuration > 0:
-		if s.TTL < s.LeaseDuration {
-			duration = s.TTL
+	case ttlKnown && s.LeaseDuration > 0:
+		if ttl < s.LeaseDuration {
+			duration = ttl
 		} else {
 			duration = s.LeaseDuration
 		}
-	case s.TTL > 0:
-		duration = s.TTL
+	case ttlKnown:
+		duration = ttl
 	case s.LeaseDuration > 0:
 		duration = s.LeaseDuration
 	default:
