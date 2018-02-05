@@ -289,18 +289,19 @@ func (s *SecretState) TTL() (int, bool) {
 	return 0, false
 }
 
-func (s *SecretState) TimeToUpdate() (time.Time, bool) {
+func (s *SecretState) TimeToUpdate() (minTTU time.Time, known bool) {
 	for _, source := range secretTTUSources {
 		ttu, err := source(s)
 		if err != nil {
 			log.Printf("Error trying to obtain TTU for secret '%s': %s", s.Name, err)
 			continue
 		}
-		if ttu != nil {
-			return *ttu, true
+		if ttu != nil && (!known || ttu.Before(minTTU)) {
+			minTTU = *ttu
+			known = true
 		}
 	}
-	return time.Time{}, false
+	return
 }
 
 func (s *SecretState) RegisterUsage(path string, priority int) {
