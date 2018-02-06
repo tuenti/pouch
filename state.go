@@ -197,20 +197,31 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	return
 }
 
-type FileSortedList []File
+type FileSortedList []PriorityFile
 
-type File struct {
-	Priority int
-	Path     string
+type PriorityFile struct {
+	Priority int    `json:"-"`
+	Path     string `json:"path,omitempty"`
 }
 
-func (s FileSortedList) MarshalJSON() ([]byte, error) {
-	sort.Sort(s)
-	var sorted_files []string
-	for _, file := range s {
-		sorted_files = append(sorted_files, file.Path)
+func (pf *PriorityFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pf.Path)
+}
+
+func (s *FileSortedList) UnmarshalJSON(data []byte) error {
+	var priorityFiles []string
+
+	if err := json.Unmarshal(data, &priorityFiles); err != nil {
+		return err
 	}
-	return json.Marshal([]string(sorted_files))
+
+	// To keep the same state as when it was written, each file is assigned a
+	// priority according to the order that they appear in the state file,
+	for i, pf := range priorityFiles {
+		*s = append(*s, PriorityFile{Path: pf, Priority: i * 10})
+	}
+
+	return nil
 }
 
 func (p FileSortedList) Len() int      { return len(p) }
@@ -285,5 +296,5 @@ func (s *SecretState) RegisterUsage(path string, priority int) {
 			return
 		}
 	}
-	s.FilesUsing = append(s.FilesUsing, File{Priority: priority, Path: path})
+	s.FilesUsing = append(s.FilesUsing, PriorityFile{Priority: priority, Path: path})
 }
