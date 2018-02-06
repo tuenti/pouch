@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Tuenti Technologies S.L. All rights reserved.
+Copyright 2018 Tuenti Technologies S.L. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,25 +20,13 @@ import (
 	"path"
 	"testing"
 
+	"github.com/tuenti/pouch/pkg/vault/test"
+
 	"github.com/hashicorp/vault/http"
 )
 
-func TestLoginWithoutSecret(t *testing.T) {
-	core, _, token := NewTestCoreAppRole(t)
-	ln, address := http.TestServer(t, core)
-	defer ln.Close()
-
-	v := vaultApi{Address: address}
-	v.RoleID = setupAppRole(t, "test", token, address, false)
-
-	err := v.Login()
-	if err != nil {
-		t.Fatalf("couldn't login: %v", err)
-	}
-}
-
 func TestLogin(t *testing.T) {
-	core, _, token := NewTestCoreAppRole(t)
+	core, _, token := test.NewTestCoreAppRole(t)
 	ln, address := http.TestServer(t, core)
 	defer ln.Close()
 
@@ -69,7 +57,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLoginWithWrappedSecret(t *testing.T) {
-	core, _, token := NewTestCoreAppRole(t)
+	core, _, token := test.NewTestCoreAppRole(t)
 	ln, address := http.TestServer(t, core)
 	defer ln.Close()
 
@@ -108,7 +96,7 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 }
 
 func TestRequestWithData(t *testing.T) {
-	core, _, token := NewTestCoreAppRole(t)
+	core, _, token := test.NewTestCoreAppRole(t)
 	ln, address := http.TestServer(t, core)
 	defer ln.Close()
 
