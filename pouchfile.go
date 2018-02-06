@@ -84,6 +84,7 @@ func LoadPouchfile(path string) (*Pouchfile, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Close()
 	return loadPouchfile(r)
 }
 
