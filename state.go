@@ -297,4 +297,5 @@ func (s *SecretState) RegisterUsage(path string, priority int) {
 		}
 	}
 	s.FilesUsing = append(s.FilesUsing, PriorityFile{Priority: priority, Path: path})
+	sort.Sort(s.FilesUsing)
 }
