@@ -33,7 +33,8 @@ const (
 	TokenHeader   = "X-Vault-Token"
 	WrapTTLHeader = "X-Vault-Wrap-Ttl"
 
-	SelfTokenURL      = "/v1//auth/token/lookup-self"
+	TokenCreateURL    = "/v1/auth/token/create"
+	SelfTokenURL      = "/v1/auth/token/lookup-self"
 	SelfTokenRenewURL = "/v1/auth/token/renew-self"
 
 	SysHealthURL = "/v1/sys/health"
@@ -103,45 +104,56 @@ func (v *vaultApi) tokenTTL() (int64, error) {
 }
 
 func (v *vaultApi) autoRenewToken() {
-	var ttl int64
-	var err error
+	const (
+		stateUpdateTTL = iota
+		stateRenew
+	)
 
-	retry := func(attempts int, t time.Duration, f func() error) {
-		for attempt := 0; attempt < attempts; attempt++ {
-			err = f()
-			if err == nil {
-				break
-			}
-			<-time.After(t)
-		}
-	}
+	state := stateUpdateTTL
+	var next time.Duration
 
 	for {
-		retry(5, 1*time.Second, func() error {
-			ttl, err = v.tokenTTL()
-			return err
-		})
-		if err != nil {
-			log.Printf("Couldn't obtain token TTL: %s\n", err)
-			break
+		switch state {
+		case stateUpdateTTL:
+			ttl, err := v.tokenTTL()
+
+			if err != nil {
+				log.Printf("Couldn't obtain token TTL: %s\n", err)
+				next = 1 * time.Second
+				break
+			}
+
+			if ttl == 0 {
+				log.Println("Using token without expiration")
+				return
+			}
+
+			state = stateRenew
+			next = time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
+			log.Printf("Next token renewal in %s", next)
+
+		case stateRenew:
+			renewable, err := v.RenewToken()
+
+			if err != nil {
+				log.Printf("Couldn't renew token: %s\n", err)
+				next = 1 * time.Second
+			} else {
+				state = stateUpdateTTL
+				next = 0
+			}
+
+			if !renewable {
+				log.Println("Token cannot be renewed anymore")
+				return
+			}
 		}
-		if ttl == 0 {
-			log.Println("Using token without expiration")
-			return
+
+		select {
+		case <-time.After(next):
 		}
-		period := time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
-		log.Printf("Next token renewal in %s", period)
-		<-time.After(period)
-		retry(5, 1*time.Second, func() error {
-			_, err = v.Request(http.MethodPost, SelfTokenRenewURL, nil)
-			return err
-		})
-		if err != nil {
-			log.Printf("Failed to renew token: %s", err)
-			break
-		}
-		log.Println("Token succesfuly renewed")
 	}
+
 	log.Println("Won't autorenew token")
 }
 
@@ -227,6 +239,35 @@ func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*ap
 		return nil, nil
 	}
 	return api.ParseSecret(resp.Body)
+}
+
+func (v *vaultApi) RenewToken() (bool, error) {
+	c, err := v.getClient()
+	if err != nil {
+		return true, err
+	}
+	if v.Token != "" {
+		c.SetToken(v.Token)
+	}
+
+	r := c.NewRequest(http.MethodPost, SelfTokenRenewURL)
+	resp, err := c.RawRequest(r)
+
+	switch resp.StatusCode {
+	case 400, 403:
+		return false, err
+	}
+
+	s, _ := api.ParseSecret(resp.Body)
+
+	if s != nil && s.Auth != nil {
+		return s.Auth.Renewable, err
+	}
+	if s != nil {
+		return s.Renewable, err
+	}
+
+	return true, err
 }
 
 func (v *vaultApi) GetToken() string {

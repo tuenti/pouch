@@ -18,6 +18,8 @@ package vault
 
 import (
 	"fmt"
+	nethttp "net/http"
+	"net/http/httptest"
 	"path"
 	"testing"
 
@@ -174,5 +176,93 @@ func TestRequestWithData(t *testing.T) {
 
 	if foundSecret != secret {
 		t.Fatalf("found: %s, expected: %s", foundSecret, secret)
+	}
+}
+
+func TestTokenRenovation(t *testing.T) {
+	core, _, token := test.NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
+
+	admin := vaultApi{
+		Address: address,
+		Token:   token,
+	}
+
+	s, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
+		Data: map[string]interface{}{
+			"renewable": true,
+			"ttl":       "1h",
+		},
+	})
+	if err != nil {
+		t.Fatalf("couldn't create new token: %v", err)
+	}
+
+	adminWithTTL := vaultApi{
+		Address: address,
+		Token:   s.Auth.ClientToken,
+	}
+
+	renewable, err := adminWithTTL.RenewToken()
+	if err != nil {
+		t.Fatalf("couldn't renew token: %v", err)
+	}
+	if !renewable {
+		t.Fatalf("token should still be renewable")
+	}
+}
+
+func TestTokenRenovationExpired(t *testing.T) {
+	core, _, token := test.NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
+
+	admin := vaultApi{
+		Address: address,
+		Token:   token,
+	}
+
+	s, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
+		Data: map[string]interface{}{
+			"renewable": true,
+			"ttl":       "0s",
+		},
+	})
+	if err != nil {
+		t.Fatalf("couldn't create new token: %v", err)
+	}
+
+	adminExpired := vaultApi{
+		Address: address,
+		Token:   s.Auth.ClientToken,
+	}
+
+	renewable, err := adminExpired.RenewToken()
+	if err == nil {
+		t.Fatalf("token renovation should have failed")
+	}
+	if renewable {
+		t.Fatalf("token should have been reported as non renewable")
+	}
+}
+
+func TestTokenRenovationUnavailableServer(t *testing.T) {
+	ln := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		w.WriteHeader(nethttp.StatusServiceUnavailable)
+	}))
+	defer ln.Close()
+
+	v := vaultApi{
+		Address: ln.URL,
+		Token:   "some-token",
+	}
+
+	renewable, err := v.RenewToken()
+	if err == nil {
+		t.Fatalf("token renovation should have failed")
+	}
+	if !renewable {
+		t.Fatalf("token should still be considered as renewable")
 	}
 }
