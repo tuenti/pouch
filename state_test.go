@@ -26,8 +26,8 @@ import (
 
 var filesUsingCases = []struct {
 	Secret          *SecretState
-	RegisteredFiles *FileSortedList
-	SortedFiles     *FileSortedList
+	RegisteredFiles *PriorityFileSortedList
+	SortedFiles     *PriorityFileSortedList
 }{
 	{
 		secretWithFilesUsing,
@@ -41,7 +41,7 @@ var filesUsingCases = []struct {
 	},
 }
 
-var filesUsingPriorities = &FileSortedList{
+var filesUsingPriorities = &PriorityFileSortedList{
 	PriorityFile{Priority: 10, Path: "/tmp2"},
 	PriorityFile{Priority: 10, Path: "/tmp1"},
 	PriorityFile{Priority: 90, Path: "/tmp3a"},
@@ -49,7 +49,7 @@ var filesUsingPriorities = &FileSortedList{
 	PriorityFile{Priority: 20, Path: "/tmp3b"},
 }
 
-var sortedFilesUsingPriorities = &FileSortedList{
+var sortedFilesUsingPriorities = &PriorityFileSortedList{
 	PriorityFile{Path: "/bar"},
 	PriorityFile{Priority: 10, Path: "/tmp1"},
 	PriorityFile{Priority: 10, Path: "/tmp2"},
@@ -59,10 +59,10 @@ var sortedFilesUsingPriorities = &FileSortedList{
 
 var secretWithFilesUsing = &SecretState{
 	Data:       map[string]interface{}{"test_key": "value_secret"},
-	FilesUsing: FileSortedList{},
+	FilesUsing: PriorityFileSortedList{},
 }
 
-var filesUsingNoPriorities = &FileSortedList{
+var filesUsingNoPriorities = &PriorityFileSortedList{
 	PriorityFile{Path: "/temp2"},
 	PriorityFile{Path: "/temp1"},
 	PriorityFile{Path: "/tempcc"},
@@ -70,7 +70,7 @@ var filesUsingNoPriorities = &FileSortedList{
 	PriorityFile{Path: "/other"},
 }
 
-var sortedFilesUsingNoPriorities = &FileSortedList{
+var sortedFilesUsingNoPriorities = &PriorityFileSortedList{
 	PriorityFile{Path: "/other"},
 	PriorityFile{Path: "/temp1"},
 	PriorityFile{Path: "/temp2"},
@@ -80,7 +80,7 @@ var sortedFilesUsingNoPriorities = &FileSortedList{
 
 func TestSortingFilesUsing(t *testing.T) {
 
-	var filesUsing FileSortedList
+	var filesUsing PriorityFileSortedList
 	for _, c := range filesUsingCases {
 		filesUsing = *c.RegisteredFiles
 		sort.Sort(filesUsing)

@@ -197,7 +197,7 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	return
 }
 
-type FileSortedList []PriorityFile
+type PriorityFileSortedList []PriorityFile
 
 type PriorityFile struct {
 	Priority int    `json:"-"`
@@ -208,7 +208,7 @@ func (pf *PriorityFile) MarshalJSON() ([]byte, error) {
 	return json.Marshal(pf.Path)
 }
 
-func (s *FileSortedList) UnmarshalJSON(data []byte) error {
+func (s *PriorityFileSortedList) UnmarshalJSON(data []byte) error {
 	var priorityFiles []string
 
 	if err := json.Unmarshal(data, &priorityFiles); err != nil {
@@ -224,9 +224,9 @@ func (s *FileSortedList) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p FileSortedList) Len() int      { return len(p) }
-func (p FileSortedList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func (p FileSortedList) Less(i, j int) bool {
+func (p PriorityFileSortedList) Len() int      { return len(p) }
+func (p PriorityFileSortedList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p PriorityFileSortedList) Less(i, j int) bool {
 	if p[i].Priority != p[j].Priority {
 		return p[i].Priority < p[j].Priority
 	}
@@ -256,7 +256,7 @@ type SecretState struct {
 	Data map[string]interface{} `json:"data,omitempty"`
 
 	// Files using this secret
-	FilesUsing FileSortedList `json:"files_using,omitempty"`
+	FilesUsing PriorityFileSortedList `json:"files_using,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
