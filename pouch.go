@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	DefaultFileMode = os.FileMode(0600)
+	DefaultFileMode   = os.FileMode(0600)
+	SecretRetryPeriod = 5 * time.Second
 )
 
 type Pouch interface {
@@ -140,18 +141,31 @@ func resolveData(data map[string]interface{}) map[string]interface{} {
 	return result
 }
 
-func (p *pouch) resolveSecret(name string, c SecretConfig) error {
+func (p *pouch) resolveSecret(name string, c SecretConfig) (retry bool, err error) {
 	options := &vault.RequestOptions{Data: resolveData(c.Data)}
-	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+	s, resp, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
 	if err != nil {
-		return err
+		switch {
+		case resp == nil:
+			// Retry if there was a connection error and no response
+			// from server was received
+			return true, err
+		case resp.StatusCode/100 == 5:
+			// If the service is behind a proxy and is unavailable
+			// or if vault is sealed, so keep trying
+			return true, err
+		case resp.StatusCode/100 == 4:
+			// If we have a 400 something is wrong with our request
+			// or our permissions, don't retry
+			return false, err
+		}
 	}
 	p.State.SetSecret(name, s)
 	err = p.State.Save()
 	if err != nil {
 		log.Printf("Couldn't save state: %s", err)
 	}
-	return nil
+	return false, nil
 }
 
 func (p *pouch) resolveFile(fc FileConfig) error {
@@ -209,7 +223,7 @@ func (p *pouch) Run(ctx context.Context) error {
 			// someone has changed
 			s.FilesUsing = nil
 		} else {
-			err = p.resolveSecret(name, c)
+			_, err = p.resolveSecret(name, c)
 			if err != nil {
 				return err
 			}
@@ -250,9 +264,16 @@ func (p *pouch) Run(ctx context.Context) error {
 		select {
 		case <-nextUpdate:
 			log.Printf("Updating secret '%s'", s.Name)
-			err = p.resolveSecret(s.Name, p.Secrets[s.Name])
-			if err != nil {
-				return err
+			for retry := true; retry; {
+				retry, err = p.resolveSecret(s.Name, p.Secrets[s.Name])
+				if err != nil {
+					if retry {
+						log.Println(err)
+						<-time.After(SecretRetryPeriod)
+					} else {
+						return err
+					}
+				}
 			}
 			for _, f := range p.State.Secrets[s.Name].FilesUsing {
 				log.Printf("Updating file '%s'", f.Path)

@@ -89,7 +89,7 @@ func main() {
 	})
 
 	if showRoleId {
-		s, err := v.Request("GET", path.Join(vault.AppRoleURL, role, "role-id"), nil)
+		s, _, err := v.Request("GET", path.Join(vault.AppRoleURL, role, "role-id"), nil)
 		if err != nil {
 			fmt.Printf("Couldn't get role ID: %s\n", err)
 			os.Exit(-1)
@@ -111,7 +111,7 @@ func main() {
 	}
 
 	options := vault.RequestOptions{WrapTTL: wrapTTL}
-	s, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
+	s, _, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
 	if err != nil {
 		fmt.Printf("Couldn't get wrapped secret ID: %s\n", err)
 		os.Exit(-1)

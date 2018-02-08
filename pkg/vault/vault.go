@@ -29,11 +29,13 @@ import (
 const (
 	// Token renewal period is its TTL multiplied by this ratio
 	AutoRenewPeriodRatio = 0.5
+	TokenRetryPeriod     = 5 * time.Second
 
 	TokenHeader   = "X-Vault-Token"
 	WrapTTLHeader = "X-Vault-Wrap-Ttl"
 
-	SelfTokenURL      = "/v1//auth/token/lookup-self"
+	TokenCreateURL    = "/v1/auth/token/create"
+	SelfTokenURL      = "/v1/auth/token/lookup-self"
 	SelfTokenRenewURL = "/v1/auth/token/renew-self"
 
 	SysHealthURL = "/v1/sys/health"
@@ -51,7 +53,7 @@ type RequestOptions struct {
 
 type Vault interface {
 	Login() error
-	Request(method, urlPath string, options *RequestOptions) (*api.Secret, error)
+	Request(method, urlPath string, options *RequestOptions) (*api.Secret, *api.Response, error)
 	UnwrapSecretID(token string) error
 	GetToken() string
 }
@@ -90,58 +92,99 @@ func (v *vaultApi) getClient() (*api.Client, error) {
 	return api.NewClient(config)
 }
 
-func (v *vaultApi) tokenTTL() (int64, error) {
-	resp, err := v.Request(http.MethodGet, SelfTokenURL, nil)
-	if err != nil || resp == nil {
-		return 0, fmt.Errorf("couldn't obtain self token information: %v", err)
+// A token is considered invalid if we receive 400 status codes
+func (v *vaultApi) tokenTTL() (ttl int64, invalid bool, err error) {
+	s, resp, err := v.Request(http.MethodGet, SelfTokenURL, nil)
+	if resp != nil && (resp.StatusCode == 400 || resp.StatusCode == 403) {
+		return 0, true, err
 	}
-	ttlNumber, ok := resp.Data["ttl"].(json.Number)
+	if err != nil {
+		return 0, false, fmt.Errorf("couldn't obtain self token information: %v", err)
+	}
+	ttlNumber, ok := s.Data["ttl"].(json.Number)
 	if !ok {
-		return 0, fmt.Errorf("couldn't obtain token TTL")
+		return 0, false, fmt.Errorf("couldn't obtain token TTL")
 	}
-	return ttlNumber.Int64()
+	ttl, err = ttlNumber.Int64()
+	return ttl, false, err
+}
+
+// A token is not considered renewable if we receive a 400 error
+// for any other case we consider that it can still be renewed
+// and we are having problems connecting to the server.
+func (v *vaultApi) renewToken() (renewable bool, err error) {
+	s, resp, err := v.Request(http.MethodPost, SelfTokenRenewURL, nil)
+	if resp != nil && (resp.StatusCode == 400 || resp.StatusCode == 403) {
+		return false, err
+	}
+	if s != nil && s.Auth != nil {
+		return s.Auth.Renewable, err
+	}
+	if s != nil {
+		return s.Renewable, err
+	}
+	return true, err
 }
 
 func (v *vaultApi) autoRenewToken() {
-	var ttl int64
-	var err error
+	const (
+		stateUpdateTTL = iota
+		stateRenew
+	)
 
-	retry := func(attempts int, t time.Duration, f func() error) {
-		for attempt := 0; attempt < attempts; attempt++ {
-			err = f()
-			if err == nil {
-				break
-			}
-			<-time.After(t)
-		}
-	}
+	state := stateUpdateTTL
+	var next time.Duration
 
 	for {
-		retry(5, 1*time.Second, func() error {
-			ttl, err = v.tokenTTL()
-			return err
-		})
-		if err != nil {
-			log.Printf("Couldn't obtain token TTL: %s\n", err)
-			break
+		switch state {
+		case stateUpdateTTL:
+			ttl, invalid, err := v.tokenTTL()
+
+			// For any other errors we should continue retryining till we
+			// confirm that the token is definitively invalid
+			if invalid {
+				log.Println("Invalid token")
+				return
+			}
+
+			if err != nil {
+				log.Printf("Couldn't obtain token TTL: %s\n", err)
+				next = TokenRetryPeriod
+				break
+			}
+
+			if ttl == 0 {
+				log.Println("Using token without expiration")
+				return
+			}
+
+			state = stateRenew
+			next = time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
+			log.Printf("Next token renewal in %s", next)
+
+		case stateRenew:
+			log.Println("Renewing token")
+			renewable, err := v.renewToken()
+
+			if err != nil {
+				log.Printf("Couldn't renew token: %s\n", err)
+				next = TokenRetryPeriod
+			} else {
+				state = stateUpdateTTL
+				next = 0
+			}
+
+			if !renewable {
+				log.Println("Token cannot be renewed anymore")
+				return
+			}
 		}
-		if ttl == 0 {
-			log.Println("Using token without expiration")
-			return
+
+		select {
+		case <-time.After(next):
 		}
-		period := time.Duration(float64(ttl)*AutoRenewPeriodRatio) * time.Second
-		log.Printf("Next token renewal in %s", period)
-		<-time.After(period)
-		retry(5, 1*time.Second, func() error {
-			_, err = v.Request(http.MethodPost, SelfTokenRenewURL, nil)
-			return err
-		})
-		if err != nil {
-			log.Printf("Failed to renew token: %s", err)
-			break
-		}
-		log.Println("Token succesfuly renewed")
 	}
+
 	log.Println("Won't autorenew token")
 }
 
@@ -159,12 +202,12 @@ func (v *vaultApi) Login() error {
 		data["secret_id"] = v.SecretID
 	}
 	options := RequestOptions{Data: data}
-	resp, err := v.Request(http.MethodPost, AppRoleLoginURL, &options)
+	s, _, err := v.Request(http.MethodPost, AppRoleLoginURL, &options)
 	if err != nil {
 		return err
 	}
 
-	v.Token = resp.Auth.ClientToken
+	v.Token = s.Auth.ClientToken
 	go v.autoRenewToken()
 
 	return nil
@@ -194,10 +237,10 @@ func (v *vaultApi) UnwrapSecretID(token string) error {
 	return nil
 }
 
-func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*api.Secret, error) {
+func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*api.Secret, *api.Response, error) {
 	c, err := v.getClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if v.Token != "" {
 		c.SetToken(v.Token)
@@ -208,7 +251,7 @@ func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*ap
 		if len(options.Data) > 0 {
 			err = r.SetJSONBody(options.Data)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 
@@ -219,14 +262,15 @@ func (v *vaultApi) Request(method, urlPath string, options *RequestOptions) (*ap
 
 	resp, err := c.RawRequest(r)
 	if err != nil {
-		return nil, err
+		return nil, resp, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
+		return nil, resp, nil
 	}
-	return api.ParseSecret(resp.Body)
+	s, err := api.ParseSecret(resp.Body)
+	return s, resp, err
 }
 
 func (v *vaultApi) GetToken() string {
