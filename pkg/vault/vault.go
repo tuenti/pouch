@@ -81,6 +81,9 @@ func New(c Config) Vault {
 
 func (v *vaultApi) getClient() (*api.Client, error) {
 	config := api.DefaultConfig()
+	if err := config.ReadEnvironment(); err != nil {
+		return nil, fmt.Errorf("couldn't read config from environment: %v", err)
+	}
 	if v.Address != "" {
 		config.Address = v.Address
 	}
