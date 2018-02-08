@@ -17,6 +17,7 @@ limitations under the License.
 package vault
 
 import (
+	"fmt"
 	"path"
 	"testing"
 
@@ -25,13 +26,52 @@ import (
 	"github.com/hashicorp/vault/http"
 )
 
+func setupAppRole(name, token, address string, secret bool) (string, error) {
+	v := vaultApi{
+		Address: address,
+		Token:   token,
+	}
+	options := RequestOptions{
+		Data: map[string]interface{}{"type": "approle"},
+	}
+	_, err := v.Request("POST", AuthAppRoleURL, &options)
+	if err != nil {
+		return "", fmt.Errorf("couldn't enable approle auth method: %s", err)
+	}
+
+	roleURL := path.Join(AppRoleURL, name)
+	roleParams := make(map[string]interface{})
+	if !secret {
+		roleParams["bind_secret_id"] = "false"
+		roleParams["bound_cidr_list"] = "127.0.0.0/8"
+	}
+	options = RequestOptions{Data: roleParams}
+	_, err = v.Request("POST", roleURL, &options)
+	if err != nil {
+		return "", fmt.Errorf("couldn't create approle testrole: %s ", err)
+	}
+
+	roleIDURL := path.Join(roleURL, "role-id")
+	s, err := v.Request("GET", roleIDURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("couldn't obtain role id: %s", err)
+	}
+
+	roleID := s.Data["role_id"].(string)
+
+	return roleID, nil
+}
+
 func TestLogin(t *testing.T) {
 	core, _, token := test.NewTestCoreAppRole(t)
 	ln, address := http.TestServer(t, core)
 	defer ln.Close()
 
 	roleName := "test"
-	roleID := setupAppRole(t, roleName, token, address, true)
+	roleID, err := setupAppRole(roleName, token, address, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	admin := vaultApi{
 		Address: address,
@@ -62,7 +102,10 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 	defer ln.Close()
 
 	roleName := "test"
-	roleID := setupAppRole(t, roleName, token, address, true)
+	roleID, err := setupAppRole(roleName, token, address, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	admin := vaultApi{
 		Address: address,

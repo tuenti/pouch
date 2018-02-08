@@ -30,6 +30,59 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type DummyVault struct {
+	T *testing.T
+
+	ExpectedToken    string
+	ExpectedSecretID string
+	WrappedSecretID  string
+
+	Token    string
+	RoleID   string
+	SecretID string
+
+	Responses map[string]*api.Secret
+}
+
+func (v *DummyVault) Login() error {
+	if v.Token != "" {
+		return nil
+	}
+	if v.RoleID == "" {
+		v.T.Fatal("unset roleID")
+	}
+	if v.SecretID != v.ExpectedSecretID {
+		v.T.Fatal("incorrect secretID")
+	}
+	v.Token = v.ExpectedToken
+	return nil
+}
+
+func (v *DummyVault) UnwrapSecretID(token string) error {
+	if token != v.WrappedSecretID {
+		v.T.Fatal("incorrect wrapped secret ID")
+	}
+	v.SecretID = v.ExpectedSecretID
+	v.WrappedSecretID = ""
+	return nil
+}
+
+func (v *DummyVault) Request(method, urlPath string, options *vault.RequestOptions) (*api.Secret, error) {
+	if v.Token != v.ExpectedToken {
+		v.T.Fatalf("incorrect token on request")
+	}
+	k := method + urlPath
+	s, ok := v.Responses[k]
+	if !ok {
+		v.T.Fatal("incorrect response")
+	}
+	return s, nil
+}
+
+func (v *DummyVault) GetToken() string {
+	return v.Token
+}
+
 func newTestState() (state *PouchState, cleanup func()) {
 	f, _ := ioutil.TempFile("", "pouch-state-test")
 	f.Close()
@@ -37,7 +90,7 @@ func newTestState() (state *PouchState, cleanup func()) {
 }
 
 func TestPouchRun(t *testing.T) {
-	v := &vault.DummyVault{
+	v := &DummyVault{
 		T: t,
 
 		ExpectedToken:    "token",
@@ -130,7 +183,7 @@ func TestPouchWatch(t *testing.T) {
 	}
 	defer os.RemoveAll(secretWrapPath.Name())
 
-	v := &vault.DummyVault{
+	v := &DummyVault{
 		T: t,
 
 		ExpectedToken:    "token",
