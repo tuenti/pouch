@@ -29,6 +29,7 @@ import (
 const (
 	// Token renewal period is its TTL multiplied by this ratio
 	AutoRenewPeriodRatio = 0.5
+	TokenRetryPeriod     = 5 * time.Second
 
 	TokenHeader   = "X-Vault-Token"
 	WrapTTLHeader = "X-Vault-Wrap-Ttl"
@@ -148,7 +149,7 @@ func (v *vaultApi) autoRenewToken() {
 
 			if err != nil {
 				log.Printf("Couldn't obtain token TTL: %s\n", err)
-				next = 1 * time.Second
+				next = TokenRetryPeriod
 				break
 			}
 
@@ -167,7 +168,7 @@ func (v *vaultApi) autoRenewToken() {
 
 			if err != nil {
 				log.Printf("Couldn't renew token: %s\n", err)
-				next = 1 * time.Second
+				next = TokenRetryPeriod
 			} else {
 				state = stateUpdateTTL
 				next = 0
