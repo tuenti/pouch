@@ -255,6 +255,7 @@ func (p *pouch) Run(ctx context.Context) error {
 				return err
 			}
 			for _, f := range p.State.Secrets[s.Name].FilesUsing {
+				log.Printf("Updating file '%s'", f.Path)
 				err = p.resolveFile(p.Files[f.Path])
 				if err != nil {
 					return err
