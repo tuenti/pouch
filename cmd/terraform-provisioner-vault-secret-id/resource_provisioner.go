@@ -120,7 +120,7 @@ func applyFn(ctx context.Context) error {
 	role := data.Get("role").(string)
 	wrapTTL := data.Get("wrap_ttl").(string)
 	options := vault.RequestOptions{WrapTTL: wrapTTL}
-	s, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
+	s, _, err := v.Request("POST", path.Join(vault.AppRoleURL, role, "secret-id"), &options)
 	if err != nil {
 		return fmt.Errorf("couldn't get wrapped secret ID: %s", err)
 	}

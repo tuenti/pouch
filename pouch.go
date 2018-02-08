@@ -142,7 +142,7 @@ func resolveData(data map[string]interface{}) map[string]interface{} {
 
 func (p *pouch) resolveSecret(name string, c SecretConfig) error {
 	options := &vault.RequestOptions{Data: resolveData(c.Data)}
-	s, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
+	s, _, err := p.Vault.Request(c.HTTPMethod, c.VaultURL, options)
 	if err != nil {
 		return err
 	}

@@ -36,7 +36,7 @@ func setupAppRole(name, token, address string, secret bool) (string, error) {
 	options := RequestOptions{
 		Data: map[string]interface{}{"type": "approle"},
 	}
-	_, err := v.Request("POST", AuthAppRoleURL, &options)
+	_, _, err := v.Request("POST", AuthAppRoleURL, &options)
 	if err != nil {
 		return "", fmt.Errorf("couldn't enable approle auth method: %s", err)
 	}
@@ -48,13 +48,13 @@ func setupAppRole(name, token, address string, secret bool) (string, error) {
 		roleParams["bound_cidr_list"] = "127.0.0.0/8"
 	}
 	options = RequestOptions{Data: roleParams}
-	_, err = v.Request("POST", roleURL, &options)
+	_, _, err = v.Request("POST", roleURL, &options)
 	if err != nil {
 		return "", fmt.Errorf("couldn't create approle testrole: %s ", err)
 	}
 
 	roleIDURL := path.Join(roleURL, "role-id")
-	s, err := v.Request("GET", roleIDURL, nil)
+	s, _, err := v.Request("GET", roleIDURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("couldn't obtain role id: %s", err)
 	}
@@ -80,7 +80,7 @@ func TestLogin(t *testing.T) {
 		Token:   token,
 	}
 	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
-	s, err := admin.Request("POST", secretIDURL, nil)
+	s, _, err := admin.Request("POST", secretIDURL, nil)
 	if err != nil {
 		t.Fatalf("couldn't obtain secret-id: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestLoginWithWrappedSecret(t *testing.T) {
 		Token:   token,
 	}
 	secretIDURL := path.Join(AppRoleURL, roleName, "secret-id")
-	s, err := admin.Request("POST", secretIDURL, &RequestOptions{
+	s, _, err := admin.Request("POST", secretIDURL, &RequestOptions{
 		WrapTTL: "10s",
 	})
 	if err != nil {
@@ -153,7 +153,7 @@ func TestRequestWithData(t *testing.T) {
 	secretURL := "/v1/secret/foo"
 	secretName := "foo"
 	secret := "this is a secret!"
-	_, err := admin.Request("POST", secretURL, &RequestOptions{
+	_, _, err := admin.Request("POST", secretURL, &RequestOptions{
 		Data: map[string]interface{}{
 			secretName: secret,
 		},
@@ -162,7 +162,7 @@ func TestRequestWithData(t *testing.T) {
 		t.Fatalf("couldn't create secret with data: %v", err)
 	}
 
-	s, err := admin.Request("GET", secretURL, nil)
+	s, _, err := admin.Request("GET", secretURL, nil)
 	if err != nil {
 		t.Fatalf("couldn't read secret")
 	}
@@ -189,7 +189,7 @@ func TestTokenRenovation(t *testing.T) {
 		Token:   token,
 	}
 
-	s, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
+	s, _, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
 		Data: map[string]interface{}{
 			"renewable": true,
 			"ttl":       "1h",
@@ -204,7 +204,7 @@ func TestTokenRenovation(t *testing.T) {
 		Token:   s.Auth.ClientToken,
 	}
 
-	renewable, err := adminWithTTL.RenewToken()
+	renewable, err := adminWithTTL.renewToken()
 	if err != nil {
 		t.Fatalf("couldn't renew token: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestTokenRenovationExpired(t *testing.T) {
 		Token:   token,
 	}
 
-	s, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
+	s, _, err := admin.Request("POST", TokenCreateURL, &RequestOptions{
 		Data: map[string]interface{}{
 			"renewable": true,
 			"ttl":       "0s",
@@ -238,7 +238,7 @@ func TestTokenRenovationExpired(t *testing.T) {
 		Token:   s.Auth.ClientToken,
 	}
 
-	renewable, err := adminExpired.RenewToken()
+	renewable, err := adminExpired.renewToken()
 	if err == nil {
 		t.Fatalf("token renovation should have failed")
 	}
@@ -258,11 +258,30 @@ func TestTokenRenovationUnavailableServer(t *testing.T) {
 		Token:   "some-token",
 	}
 
-	renewable, err := v.RenewToken()
+	renewable, err := v.renewToken()
 	if err == nil {
 		t.Fatalf("token renovation should have failed")
 	}
 	if !renewable {
 		t.Fatalf("token should still be considered as renewable")
+	}
+}
+
+func TestGetTokenTTL(t *testing.T) {
+	core, _, _ := test.NewTestCoreAppRole(t)
+	ln, address := http.TestServer(t, core)
+	defer ln.Close()
+
+	broken := vaultApi{
+		Address: address,
+		Token:   "bad-token",
+	}
+
+	_, invalid, err := broken.tokenTTL()
+	if err == nil {
+		t.Fatalf("this should have failed")
+	}
+	if !invalid {
+		t.Fatalf("token should be reported as invalid")
 	}
 }

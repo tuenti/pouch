@@ -67,7 +67,7 @@ func (v *DummyVault) UnwrapSecretID(token string) error {
 	return nil
 }
 
-func (v *DummyVault) Request(method, urlPath string, options *vault.RequestOptions) (*api.Secret, error) {
+func (v *DummyVault) Request(method, urlPath string, options *vault.RequestOptions) (*api.Secret, *api.Response, error) {
 	if v.Token != v.ExpectedToken {
 		v.T.Fatalf("incorrect token on request")
 	}
@@ -76,7 +76,7 @@ func (v *DummyVault) Request(method, urlPath string, options *vault.RequestOptio
 	if !ok {
 		v.T.Fatal("incorrect response")
 	}
-	return s, nil
+	return s, nil, nil
 }
 
 func (v *DummyVault) GetToken() string {
