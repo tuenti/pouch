@@ -69,6 +69,7 @@ type FileConfig struct {
 	Template     string   `json:"template,omitempty"`
 	TemplateFile string   `json:"template_file,omitempty"`
 	Notify       []string `json:"notify,omitempty"`
+	Priority     int      `json:"priority,omitempty"`
 }
 
 type NotifierConfig struct {
@@ -83,6 +84,7 @@ func LoadPouchfile(path string) (*Pouchfile, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Close()
 	return loadPouchfile(r)
 }
 

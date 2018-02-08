@@ -197,11 +197,40 @@ func (s *PouchState) NextUpdate() (secret *SecretState, minTTU time.Duration) {
 	return
 }
 
-type JSONSortedStringList []string
+type PriorityFileSortedList []PriorityFile
 
-func (s JSONSortedStringList) MarshalJSON() ([]byte, error) {
-	sort.Strings(s)
-	return json.Marshal([]string(s))
+type PriorityFile struct {
+	Priority int    `json:"-"`
+	Path     string `json:"path,omitempty"`
+}
+
+func (pf *PriorityFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pf.Path)
+}
+
+func (s *PriorityFileSortedList) UnmarshalJSON(data []byte) error {
+	var priorityFiles []string
+
+	if err := json.Unmarshal(data, &priorityFiles); err != nil {
+		return err
+	}
+
+	// To keep the same state as when it was written, each file is assigned a
+	// priority according to the order that they appear in the state file,
+	for i, pf := range priorityFiles {
+		*s = append(*s, PriorityFile{Path: pf, Priority: i * 10})
+	}
+
+	return nil
+}
+
+func (p PriorityFileSortedList) Len() int      { return len(p) }
+func (p PriorityFileSortedList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p PriorityFileSortedList) Less(i, j int) bool {
+	if p[i].Priority != p[j].Priority {
+		return p[i].Priority < p[j].Priority
+	}
+	return p[i].Path < p[j].Path
 }
 
 type SecretState struct {
@@ -227,7 +256,7 @@ type SecretState struct {
 	Data map[string]interface{} `json:"data,omitempty"`
 
 	// Files using this secret
-	FilesUsing JSONSortedStringList `json:"files_using,omitempty"`
+	FilesUsing PriorityFileSortedList `json:"files_using,omitempty"`
 }
 
 func (s *SecretState) TimeToUpdate() time.Duration {
@@ -260,16 +289,13 @@ func (s *SecretState) TimeToUpdate() time.Duration {
 	return (time.Duration(float64(duration)*ratio) * time.Second) - time.Now().Sub(s.Timestamp)
 }
 
-func (s *SecretState) RegisterUsage(path string) {
-	if s.FilesUsing == nil {
-		s.FilesUsing = []string{path}
-		return
-	}
+func (s *SecretState) RegisterUsage(path string, priority int) {
 	for _, f := range s.FilesUsing {
-		if f == path {
+		if f.Path == path {
 			// Already registered
 			return
 		}
 	}
-	s.FilesUsing = append(s.FilesUsing, path)
+	s.FilesUsing = append(s.FilesUsing, PriorityFile{Priority: priority, Path: path})
+	sort.Sort(s.FilesUsing)
 }

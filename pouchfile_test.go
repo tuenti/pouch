@@ -35,16 +35,16 @@ secrets:
   foo:
     vault_url: /v1/kubernetes-pki/issue/kubelet
     http_method: POST
-    files:
-    - path: /etc/kubernetes/ssl/client.key
-      template: |
-        {{ .private_key }}
-    - path: /etc/kubernetes/ssl/client.crt
-      template: |
-        {{ .certificate }}
-    - path: /etc/kubernetes/ssl/ca.crt
-      template: |
-        {{ .issuing_ca }}
+files:
+  - path: /etc/kubernetes/ssl/client.key
+    template: |
+      {{ .private_key }}
+  - path: /etc/kubernetes/ssl/client.crt
+    template: |
+      {{ .certificate }}
+  - path: /etc/kubernetes/ssl/ca.crt
+    template: |
+      {{ .issuing_ca }}
 `,
 	`
 wrapped_secret_id_path: /var/run/vault_token
@@ -59,14 +59,41 @@ secrets:
   nginx:
     vault_url: /v1/pki/issue/nginx
     http_method: POST
-    files:
-    - path: /etc/nginx/ssl/bundle.crt
-      template: |
-        {{ .certificate }}
-        {{ .issuing_ca }}
-    - path: /etc/nginx/ssl/server.key
-      template: |
-        {{ .private_key }}
+files:
+  - path: /etc/nginx/ssl/bundle.crt
+    template: |
+      {{ .certificate }}
+      {{ .issuing_ca }}
+  - path: /etc/nginx/ssl/server.key
+    template: |
+      {{ .private_key }}
+`,
+	`
+wrapped_secret_id_path: /var/run/vault_token
+vault:
+  address: http://127.0.0.1:8200
+  role_id: kubelet
+  secret_id: ""
+  token: ""
+systemd:
+  enabled: true
+secrets:
+  nginx:
+    vault_url: /v1/pki/issue/nginx
+    http_method: POST
+files:
+  - path: /etc/kubernetes/ssl/client.key
+    priority: 10
+    template: |
+      {{ .private_key }}
+  - path: /etc/kubernetes/ssl/client.crt
+    priority: 20
+    template: |
+      {{ .certificate }}
+  - path: /etc/kubernetes/ssl/ca.crt
+    priority: 5
+    template: |
+      {{ .issuing_ca }}
 `,
 }
 

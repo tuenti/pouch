@@ -95,6 +95,7 @@ files:
   template_file: <path to file containing a template>
   notify:
   - <notifier>
+  priority: <integer>
   <...>
 ```
 Files to be provisioned using defined secrets. When the file is written, the
@@ -106,6 +107,9 @@ Access to secrets from templates is done by using the `secret` function. This
 function has two arguments, first one the name of the secret and second one
 the key of the value inside the secret.
 Files are automatically updated when a secret they use is requested again.
+Optionally, if it is needed an specific order to update the files, a priority
+could be assigned to each file. The lower the defined priority value,
+the sooner the file will be updated. Default value for priority field is *zero*.
 
 As an example:
 
@@ -126,10 +130,12 @@ files:
   mode: 0600
   template: |
     {{ secret "kubelet_certs" "private_key" }}
+  priority: 10
 - path: /etc/kubernetes/ssl/client.crt
   mode: 0600
   template: |
     {{ secret "kubelet_certs" "certificate" }}
+  priority: 20
 - path: /etc/kubernetes/ssl/ca.crt
   mode: 0600
   template: |
