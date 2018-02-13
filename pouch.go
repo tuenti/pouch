@@ -197,10 +197,24 @@ func (p *pouch) resolveFile(fc FileConfig) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(fc.Path, []byte(content), mode)
+	file, err := os.OpenFile(fc.Path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, mode)
+	if err != nil {
+		return fmt.Errorf("couldn't open %s file to be written: %s", fc.Path, err)
+	}
+	defer file.Close()
+
+	bytesWritten, err := file.Write([]byte(content))
 	if err != nil {
 		return fmt.Errorf("couldn't write secret in '%s': %s", fc.Path, err)
 	}
+
+	// Ensure file contents have been committed to disk
+	err = file.Sync()
+	if err != nil {
+		return fmt.Errorf("not able to commit the file '%s' to disk: %s", fc.Path, err)
+	}
+
+	log.Printf("Written %d bytes into %s", bytesWritten, fc.Path)
 
 	p.addForNotify(fc.Notify...)
 	return nil
