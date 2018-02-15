@@ -43,6 +43,6 @@ clean:
 release:
 	@if echo $(VERSION) | grep -q "dev$$" ; then echo Set VERSION variable to release; exit 1; fi
 	@if git show v$(VERSION) > /dev/null 2>&1; then echo Version $(VERSION) already exists; exit 1; fi
-	sed -i "s/^VERSION :=.*/VERSION := $(VERSION)/" Makefile
+	sed -i '' "s/^VERSION :=.*/VERSION := $(VERSION)/" Makefile
 	git commit Makefile -m "Version $(VERSION)"
 	git tag v$(VERSION) -a -m "Version $(VERSION)"
